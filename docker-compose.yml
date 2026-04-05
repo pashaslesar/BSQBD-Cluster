@@ -118,7 +118,7 @@ services:
       - mongo-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
+      test: ["CMD", "mongosh", "--port", "27018", "--eval", "db.adminCommand({ping:1})"]
       interval: 15s
       timeout: 15s
       retries: 20
@@ -289,7 +289,6 @@ services:
       - configsvr1
       - configsvr2
       - configsvr3
-    # Restarts until csrs is initialized by mongo-setup
     restart: on-failure
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27017", "--quiet", "--eval", "db.adminCommand({ping:1})"]
@@ -300,13 +299,12 @@ services:
 
   # ─────────────────────────────────────────────
   # One-shot setup container
-  # Run manually after cluster is up:
-  #   docker compose run --rm mongo-setup
+  # Bind-mounts /data/db and /data/configdb to prevent
+  # the anonymous-volume overlay2 read-only error on this host.
   # ─────────────────────────────────────────────
   mongo-setup:
     image: mongo:8.0
     container_name: mongo-setup
-    profiles: ["setup"]
     networks:
       - mongo-net
     depends_on:
