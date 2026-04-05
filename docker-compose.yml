@@ -280,7 +280,7 @@ services:
     entrypoint: ["/bin/bash", "/scripts/mongos-entrypoint.sh"]
     volumes:
       - ./FunctionalSolution/scripts:/scripts:ro
-      - ./Data:/data:ro
+      - ./Data:/csv-data:ro
     ports:
       - "27017:27017"
     networks:

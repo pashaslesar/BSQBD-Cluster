@@ -1,7 +1,7 @@
 MONGOS_HOST="mongos"
 MONGOS_PORT="27017"
 DB="restaurants"
-DATA_DIR="/data"
+DATA_DIR="/csv-data"
 TMP_DIR="/tmp/csv-clean"
 
 mkdir -p "$TMP_DIR"
