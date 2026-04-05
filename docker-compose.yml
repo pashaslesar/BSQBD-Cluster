@@ -19,6 +19,10 @@ volumes:
   shard3-3-data:
 
 services:
+
+  # ─────────────────────────────────────────────
+  # Config Server Replica Set  (csrs)
+  # ─────────────────────────────────────────────
   configsvr1:
     image: mongo:8.0
     container_name: configsvr1
@@ -33,11 +37,11 @@ services:
       - mongo-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27019", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 20s
+      test: ["CMD", "mongosh", "--port", "27019", "--quiet", "--eval", "db.adminCommand({ping:1})"]
+      interval: 15s
+      timeout: 15s
+      retries: 20
+      start_period: 60s
 
   configsvr2:
     image: mongo:8.0
@@ -53,11 +57,11 @@ services:
       - mongo-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27019", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 20s
+      test: ["CMD", "mongosh", "--port", "27019", "--quiet", "--eval", "db.adminCommand({ping:1})"]
+      interval: 15s
+      timeout: 15s
+      retries: 20
+      start_period: 60s
 
   configsvr3:
     image: mongo:8.0
@@ -73,12 +77,15 @@ services:
       - mongo-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27019", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 20s
+      test: ["CMD", "mongosh", "--port", "27019", "--quiet", "--eval", "db.adminCommand({ping:1})"]
+      interval: 15s
+      timeout: 15s
+      retries: 20
+      start_period: 60s
 
+  # ─────────────────────────────────────────────
+  # Shard 1 Replica Set  (rs1)
+  # ─────────────────────────────────────────────
   shard1-1:
     image: mongo:8.0
     container_name: shard1-1
@@ -93,11 +100,11 @@ services:
       - mongo-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 20s
+      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
+      interval: 15s
+      timeout: 15s
+      retries: 20
+      start_period: 60s
 
   shard1-2:
     image: mongo:8.0
@@ -113,11 +120,11 @@ services:
       - mongo-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 20s
+      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
+      interval: 15s
+      timeout: 15s
+      retries: 20
+      start_period: 60s
 
   shard1-3:
     image: mongo:8.0
@@ -133,12 +140,15 @@ services:
       - mongo-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 20s
+      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
+      interval: 15s
+      timeout: 15s
+      retries: 20
+      start_period: 60s
 
+  # ─────────────────────────────────────────────
+  # Shard 2 Replica Set  (rs2)
+  # ─────────────────────────────────────────────
   shard2-1:
     image: mongo:8.0
     container_name: shard2-1
@@ -153,11 +163,11 @@ services:
       - mongo-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 20s
+      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
+      interval: 15s
+      timeout: 15s
+      retries: 20
+      start_period: 60s
 
   shard2-2:
     image: mongo:8.0
@@ -173,11 +183,11 @@ services:
       - mongo-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 20s
+      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
+      interval: 15s
+      timeout: 15s
+      retries: 20
+      start_period: 60s
 
   shard2-3:
     image: mongo:8.0
@@ -193,12 +203,15 @@ services:
       - mongo-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 20s
+      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
+      interval: 15s
+      timeout: 15s
+      retries: 20
+      start_period: 60s
 
+  # ─────────────────────────────────────────────
+  # Shard 3 Replica Set  (rs3)
+  # ─────────────────────────────────────────────
   shard3-1:
     image: mongo:8.0
     container_name: shard3-1
@@ -213,11 +226,11 @@ services:
       - mongo-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 20s
+      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
+      interval: 15s
+      timeout: 15s
+      retries: 20
+      start_period: 60s
 
   shard3-2:
     image: mongo:8.0
@@ -233,11 +246,11 @@ services:
       - mongo-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 20s
+      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
+      interval: 15s
+      timeout: 15s
+      retries: 20
+      start_period: 60s
 
   shard3-3:
     image: mongo:8.0
@@ -253,12 +266,15 @@ services:
       - mongo-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 20s
+      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
+      interval: 15s
+      timeout: 15s
+      retries: 20
+      start_period: 60s
 
+  # ─────────────────────────────────────────────
+  # mongos Router
+  # ─────────────────────────────────────────────
   mongos:
     image: mongo:8.0
     container_name: mongos
@@ -275,50 +291,47 @@ services:
       - configsvr1
       - configsvr2
       - configsvr3
+    # Restarts until csrs is initialized by mongo-setup
     restart: on-failure
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27017", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD", "mongosh", "--port", "27017", "--quiet", "--eval", "db.adminCommand({ping:1})"]
+      interval: 15s
+      timeout: 15s
       retries: 30
-      start_period: 30s
+      start_period: 60s
 
+  # ─────────────────────────────────────────────
+  # One-shot setup container
+  # Depends only on service_started (not healthy) –
+  # the wait_mongo() function inside the script handles actual readiness.
+  # ─────────────────────────────────────────────
   mongo-setup:
     image: mongo:8.0
     container_name: mongo-setup
     networks:
       - mongo-net
     depends_on:
-      configsvr1:
-        condition: service_healthy
-      configsvr2:
-        condition: service_healthy
-      configsvr3:
-        condition: service_healthy
-      shard1-1:
-        condition: service_healthy
-      shard1-2:
-        condition: service_healthy
-      shard1-3:
-        condition: service_healthy
-      shard2-1:
-        condition: service_healthy
-      shard2-2:
-        condition: service_healthy
-      shard2-3:
-        condition: service_healthy
-      shard3-1:
-        condition: service_healthy
-      shard3-2:
-        condition: service_healthy
-      shard3-3:
-        condition: service_healthy
+      - configsvr1
+      - configsvr2
+      - configsvr3
+      - shard1-1
+      - shard1-2
+      - shard1-3
+      - shard2-1
+      - shard2-2
+      - shard2-3
+      - shard3-1
+      - shard3-2
+      - shard3-3
     volumes:
       - ./FunctionalSolution/scripts:/scripts:ro
       - ./Data:/data:ro
     entrypoint: ["bash", "/scripts/setup-cluster.sh"]
     restart: "no"
 
+  # ─────────────────────────────────────────────
+  # MongoDB Compass Web UI
+  # ─────────────────────────────────────────────
   compass-web:
     image: haohanyang/compass-web:latest
     container_name: compass-web
