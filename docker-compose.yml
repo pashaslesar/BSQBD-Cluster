@@ -118,7 +118,7 @@ services:
       - mongo-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27018", "--eval", "db.adminCommand({ping:1})"]
+      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
       interval: 15s
       timeout: 15s
       retries: 20
@@ -296,37 +296,6 @@ services:
       timeout: 15s
       retries: 30
       start_period: 60s
-
-  # ─────────────────────────────────────────────
-  # One-shot setup container
-  # Bind-mounts /data/db and /data/configdb to prevent
-  # the anonymous-volume overlay2 read-only error on this host.
-  # ─────────────────────────────────────────────
-  mongo-setup:
-    image: mongo:8.0
-    container_name: mongo-setup
-    networks:
-      - mongo-net
-    depends_on:
-      - configsvr1
-      - configsvr2
-      - configsvr3
-      - shard1-1
-      - shard1-2
-      - shard1-3
-      - shard2-1
-      - shard2-2
-      - shard2-3
-      - shard3-1
-      - shard3-2
-      - shard3-3
-    volumes:
-      - /tmp/mongo-setup-db:/data/db
-      - /tmp/mongo-setup-configdb:/data/configdb
-      - ./FunctionalSolution/scripts:/scripts:ro
-      - ./Data:/data:ro
-    entrypoint: ["bash", "/scripts/setup-cluster.sh"]
-    restart: "no"
 
   # ─────────────────────────────────────────────
   # MongoDB Compass Web UI
