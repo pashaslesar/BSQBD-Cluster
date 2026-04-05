@@ -1,0 +1,329 @@
+version: '3.8'
+
+networks:
+  mongo-net:
+    driver: bridge
+
+volumes:
+  configsvr1-data:
+  configsvr2-data:
+  configsvr3-data:
+  shard1-1-data:
+  shard1-2-data:
+  shard1-3-data:
+  shard2-1-data:
+  shard2-2-data:
+  shard2-3-data:
+  shard3-1-data:
+  shard3-2-data:
+  shard3-3-data:
+
+services:
+  configsvr1:
+    image: mongo:8.0
+    container_name: configsvr1
+    hostname: configsvr1
+    command: >
+      mongod --configsvr --replSet csrs --port 27019
+      --dbpath /data/db --bind_ip_all
+      --wiredTigerCacheSizeGB 0.25
+    volumes:
+      - configsvr1-data:/data/db
+    networks:
+      - mongo-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27019", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  configsvr2:
+    image: mongo:8.0
+    container_name: configsvr2
+    hostname: configsvr2
+    command: >
+      mongod --configsvr --replSet csrs --port 27019
+      --dbpath /data/db --bind_ip_all
+      --wiredTigerCacheSizeGB 0.25
+    volumes:
+      - configsvr2-data:/data/db
+    networks:
+      - mongo-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27019", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  configsvr3:
+    image: mongo:8.0
+    container_name: configsvr3
+    hostname: configsvr3
+    command: >
+      mongod --configsvr --replSet csrs --port 27019
+      --dbpath /data/db --bind_ip_all
+      --wiredTigerCacheSizeGB 0.25
+    volumes:
+      - configsvr3-data:/data/db
+    networks:
+      - mongo-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27019", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  shard1-1:
+    image: mongo:8.0
+    container_name: shard1-1
+    hostname: shard1-1
+    command: >
+      mongod --shardsvr --replSet rs1 --port 27018
+      --dbpath /data/db --bind_ip_all
+      --wiredTigerCacheSizeGB 0.5
+    volumes:
+      - shard1-1-data:/data/db
+    networks:
+      - mongo-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  shard1-2:
+    image: mongo:8.0
+    container_name: shard1-2
+    hostname: shard1-2
+    command: >
+      mongod --shardsvr --replSet rs1 --port 27018
+      --dbpath /data/db --bind_ip_all
+      --wiredTigerCacheSizeGB 0.5
+    volumes:
+      - shard1-2-data:/data/db
+    networks:
+      - mongo-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  shard1-3:
+    image: mongo:8.0
+    container_name: shard1-3
+    hostname: shard1-3
+    command: >
+      mongod --shardsvr --replSet rs1 --port 27018
+      --dbpath /data/db --bind_ip_all
+      --wiredTigerCacheSizeGB 0.5
+    volumes:
+      - shard1-3-data:/data/db
+    networks:
+      - mongo-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  shard2-1:
+    image: mongo:8.0
+    container_name: shard2-1
+    hostname: shard2-1
+    command: >
+      mongod --shardsvr --replSet rs2 --port 27018
+      --dbpath /data/db --bind_ip_all
+      --wiredTigerCacheSizeGB 0.5
+    volumes:
+      - shard2-1-data:/data/db
+    networks:
+      - mongo-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  shard2-2:
+    image: mongo:8.0
+    container_name: shard2-2
+    hostname: shard2-2
+    command: >
+      mongod --shardsvr --replSet rs2 --port 27018
+      --dbpath /data/db --bind_ip_all
+      --wiredTigerCacheSizeGB 0.5
+    volumes:
+      - shard2-2-data:/data/db
+    networks:
+      - mongo-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  shard2-3:
+    image: mongo:8.0
+    container_name: shard2-3
+    hostname: shard2-3
+    command: >
+      mongod --shardsvr --replSet rs2 --port 27018
+      --dbpath /data/db --bind_ip_all
+      --wiredTigerCacheSizeGB 0.5
+    volumes:
+      - shard2-3-data:/data/db
+    networks:
+      - mongo-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  shard3-1:
+    image: mongo:8.0
+    container_name: shard3-1
+    hostname: shard3-1
+    command: >
+      mongod --shardsvr --replSet rs3 --port 27018
+      --dbpath /data/db --bind_ip_all
+      --wiredTigerCacheSizeGB 0.5
+    volumes:
+      - shard3-1-data:/data/db
+    networks:
+      - mongo-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  shard3-2:
+    image: mongo:8.0
+    container_name: shard3-2
+    hostname: shard3-2
+    command: >
+      mongod --shardsvr --replSet rs3 --port 27018
+      --dbpath /data/db --bind_ip_all
+      --wiredTigerCacheSizeGB 0.5
+    volumes:
+      - shard3-2-data:/data/db
+    networks:
+      - mongo-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  shard3-3:
+    image: mongo:8.0
+    container_name: shard3-3
+    hostname: shard3-3
+    command: >
+      mongod --shardsvr --replSet rs3 --port 27018
+      --dbpath /data/db --bind_ip_all
+      --wiredTigerCacheSizeGB 0.5
+    volumes:
+      - shard3-3-data:/data/db
+    networks:
+      - mongo-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  mongos:
+    image: mongo:8.0
+    container_name: mongos
+    hostname: mongos
+    command: >
+      mongos
+      --configdb csrs/configsvr1:27019,configsvr2:27019,configsvr3:27019
+      --bind_ip_all --port 27017
+    ports:
+      - "27017:27017"
+    networks:
+      - mongo-net
+    depends_on:
+      - configsvr1
+      - configsvr2
+      - configsvr3
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27017", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  mongo-setup:
+    image: mongo:8.0
+    container_name: mongo-setup
+    networks:
+      - mongo-net
+    depends_on:
+      configsvr1:
+        condition: service_healthy
+      configsvr2:
+        condition: service_healthy
+      configsvr3:
+        condition: service_healthy
+      shard1-1:
+        condition: service_healthy
+      shard1-2:
+        condition: service_healthy
+      shard1-3:
+        condition: service_healthy
+      shard2-1:
+        condition: service_healthy
+      shard2-2:
+        condition: service_healthy
+      shard2-3:
+        condition: service_healthy
+      shard3-1:
+        condition: service_healthy
+      shard3-2:
+        condition: service_healthy
+      shard3-3:
+        condition: service_healthy
+    volumes:
+      - ./FunctionalSolution/scripts:/scripts:ro
+      - ./Data:/data:ro
+    entrypoint: ["bash", "/scripts/setup-cluster.sh"]
+    restart: "no"
+
+  compass-web:
+    image: haohanyang/compass-web:latest
+    container_name: compass-web
+    ports:
+      - "8080:80"
+    networks:
+      - mongo-net
+    restart: unless-stopped
