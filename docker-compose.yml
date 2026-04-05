@@ -277,10 +277,10 @@ services:
     image: mongo:8.0
     container_name: mongos
     hostname: mongos
-    command: >
-      mongos
-      --configdb csrs/configsvr1:27019,configsvr2:27019,configsvr3:27019
-      --bind_ip_all --port 27017
+    entrypoint: ["/bin/bash", "/scripts/mongos-entrypoint.sh"]
+    volumes:
+      - ./FunctionalSolution/scripts:/scripts:ro
+      - ./Data:/data:ro
     ports:
       - "27017:27017"
     networks:
