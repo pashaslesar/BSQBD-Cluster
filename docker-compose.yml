@@ -1,5 +1,3 @@
-version: '3.8'
-
 networks:
   mongo-net:
     driver: bridge
@@ -302,12 +300,13 @@ services:
 
   # ─────────────────────────────────────────────
   # One-shot setup container
-  # Depends only on service_started (not healthy) –
-  # the wait_mongo() function inside the script handles actual readiness.
+  # Run manually after cluster is up:
+  #   docker compose run --rm mongo-setup
   # ─────────────────────────────────────────────
   mongo-setup:
     image: mongo:8.0
     container_name: mongo-setup
+    profiles: ["setup"]
     networks:
       - mongo-net
     depends_on:
@@ -324,6 +323,8 @@ services:
       - shard3-2
       - shard3-3
     volumes:
+      - /tmp/mongo-setup-db:/data/db
+      - /tmp/mongo-setup-configdb:/data/configdb
       - ./FunctionalSolution/scripts:/scripts:ro
       - ./Data:/data:ro
     entrypoint: ["bash", "/scripts/setup-cluster.sh"]
