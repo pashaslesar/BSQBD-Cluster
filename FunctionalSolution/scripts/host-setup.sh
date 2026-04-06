@@ -1,6 +1,3 @@
-#!/bin/bash
-# Run this script on the HOST (not inside a container) after docker compose up -d
-# It uses docker exec to initialize the cluster inside already-running containers.
 set -e
 
 DATA_DIR="$(cd "$(dirname "$0")/../.." && pwd)/Data"

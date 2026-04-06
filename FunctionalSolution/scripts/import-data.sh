@@ -4,10 +4,14 @@ DB="restaurants"
 DATA_DIR="/csv-data"
 TMP_DIR="/tmp/csv-clean"
 
+ADMIN_USER="${MONGO_ADMIN_USER:-admin}"
+ADMIN_PASS="${MONGO_ADMIN_PASS:-RestCluster2024!}"
+
 mkdir -p "$TMP_DIR"
 
 count_docs() {
     mongosh --host "$MONGOS_HOST" --port "$MONGOS_PORT" --quiet \
+        -u "$ADMIN_USER" -p "$ADMIN_PASS" --authenticationDatabase admin \
         --eval "db.getSiblingDB('$DB').$1.estimatedDocumentCount()" 2>/dev/null || echo "0"
 }
 
@@ -19,6 +23,9 @@ run_import() {
         --port "$MONGOS_PORT" \
         --db  "$DB" \
         --collection "$collection" \
+        --authenticationDatabase admin \
+        --username "$ADMIN_USER" \
+        --password "$ADMIN_PASS" \
         --type csv \
         --headerline \
         --ignoreBlanks \
@@ -66,7 +73,9 @@ echo "[done] All imports finished"
 
 echo ""
 echo "── Record counts per collection ──"
-mongosh --host "$MONGOS_HOST" --port "$MONGOS_PORT" --quiet --eval "
+mongosh --host "$MONGOS_HOST" --port "$MONGOS_PORT" --quiet \
+    -u "$ADMIN_USER" -p "$ADMIN_PASS" --authenticationDatabase admin \
+    --eval "
 var db = db.getSiblingDB('restaurants');
 ['dubai_restaurants','usa_fastfood','indian_restaurants'].forEach(c => {
     print(c + ': ' + db[c].estimatedDocumentCount() + ' docs');
@@ -75,7 +84,9 @@ var db = db.getSiblingDB('restaurants');
 
 echo ""
 echo "── Chunk distribution across shards ──"
-mongosh --host "$MONGOS_HOST" --port "$MONGOS_PORT" --quiet --eval "
+mongosh --host "$MONGOS_HOST" --port "$MONGOS_PORT" --quiet \
+    -u "$ADMIN_USER" -p "$ADMIN_PASS" --authenticationDatabase admin \
+    --eval "
 var cfgDb = db.getSiblingDB('config');
 var pipeline = [
   { \$group: { _id: '\$shard', chunks: { \$sum: 1 } } },

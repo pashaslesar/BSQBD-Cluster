@@ -3,6 +3,7 @@ networks:
     driver: bridge
 
 volumes:
+  keyfile-data:
   configsvr1-data:
   configsvr2-data:
   configsvr3-data:
@@ -18,9 +19,26 @@ volumes:
 
 services:
 
-  # ─────────────────────────────────────────────
-  # Config Server Replica Set  (csrs)
-  # ─────────────────────────────────────────────
+  keyfile-init:
+    image: mongo:8.0
+    container_name: keyfile-init
+    command: >
+      bash -c "
+        if [ ! -f /keyfile/mongodb.key ]; then
+          openssl rand -base64 756 > /keyfile/mongodb.key &&
+          chmod 400 /keyfile/mongodb.key &&
+          chown 999:999 /keyfile/mongodb.key &&
+          echo '[done] Keyfile generated';
+        else
+          echo '[skip] Keyfile already exists';
+        fi
+      "
+    volumes:
+      - keyfile-data:/keyfile
+    networks:
+      - mongo-net
+    restart: "no"
+
   configsvr1:
     image: mongo:8.0
     container_name: configsvr1
@@ -29,10 +47,15 @@ services:
       mongod --configsvr --replSet csrs --port 27019
       --dbpath /data/db --bind_ip_all
       --wiredTigerCacheSizeGB 0.25
+      --keyFile /keyfile/mongodb.key
     volumes:
       - configsvr1-data:/data/db
+      - keyfile-data:/keyfile:ro
     networks:
       - mongo-net
+    depends_on:
+      keyfile-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27019", "--quiet", "--eval", "db.adminCommand({ping:1})"]
@@ -49,10 +72,15 @@ services:
       mongod --configsvr --replSet csrs --port 27019
       --dbpath /data/db --bind_ip_all
       --wiredTigerCacheSizeGB 0.25
+      --keyFile /keyfile/mongodb.key
     volumes:
       - configsvr2-data:/data/db
+      - keyfile-data:/keyfile:ro
     networks:
       - mongo-net
+    depends_on:
+      keyfile-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27019", "--quiet", "--eval", "db.adminCommand({ping:1})"]
@@ -69,10 +97,15 @@ services:
       mongod --configsvr --replSet csrs --port 27019
       --dbpath /data/db --bind_ip_all
       --wiredTigerCacheSizeGB 0.25
+      --keyFile /keyfile/mongodb.key
     volumes:
       - configsvr3-data:/data/db
+      - keyfile-data:/keyfile:ro
     networks:
       - mongo-net
+    depends_on:
+      keyfile-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27019", "--quiet", "--eval", "db.adminCommand({ping:1})"]
@@ -81,9 +114,6 @@ services:
       retries: 20
       start_period: 60s
 
-  # ─────────────────────────────────────────────
-  # Shard 1 Replica Set  (rs1)
-  # ─────────────────────────────────────────────
   shard1-1:
     image: mongo:8.0
     container_name: shard1-1
@@ -92,10 +122,15 @@ services:
       mongod --shardsvr --replSet rs1 --port 27018
       --dbpath /data/db --bind_ip_all
       --wiredTigerCacheSizeGB 0.5
+      --keyFile /keyfile/mongodb.key
     volumes:
       - shard1-1-data:/data/db
+      - keyfile-data:/keyfile:ro
     networks:
       - mongo-net
+    depends_on:
+      keyfile-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
@@ -112,10 +147,15 @@ services:
       mongod --shardsvr --replSet rs1 --port 27018
       --dbpath /data/db --bind_ip_all
       --wiredTigerCacheSizeGB 0.5
+      --keyFile /keyfile/mongodb.key
     volumes:
       - shard1-2-data:/data/db
+      - keyfile-data:/keyfile:ro
     networks:
       - mongo-net
+    depends_on:
+      keyfile-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
@@ -132,10 +172,15 @@ services:
       mongod --shardsvr --replSet rs1 --port 27018
       --dbpath /data/db --bind_ip_all
       --wiredTigerCacheSizeGB 0.5
+      --keyFile /keyfile/mongodb.key
     volumes:
       - shard1-3-data:/data/db
+      - keyfile-data:/keyfile:ro
     networks:
       - mongo-net
+    depends_on:
+      keyfile-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
@@ -144,9 +189,6 @@ services:
       retries: 20
       start_period: 60s
 
-  # ─────────────────────────────────────────────
-  # Shard 2 Replica Set  (rs2)
-  # ─────────────────────────────────────────────
   shard2-1:
     image: mongo:8.0
     container_name: shard2-1
@@ -155,10 +197,15 @@ services:
       mongod --shardsvr --replSet rs2 --port 27018
       --dbpath /data/db --bind_ip_all
       --wiredTigerCacheSizeGB 0.5
+      --keyFile /keyfile/mongodb.key
     volumes:
       - shard2-1-data:/data/db
+      - keyfile-data:/keyfile:ro
     networks:
       - mongo-net
+    depends_on:
+      keyfile-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
@@ -175,10 +222,15 @@ services:
       mongod --shardsvr --replSet rs2 --port 27018
       --dbpath /data/db --bind_ip_all
       --wiredTigerCacheSizeGB 0.5
+      --keyFile /keyfile/mongodb.key
     volumes:
       - shard2-2-data:/data/db
+      - keyfile-data:/keyfile:ro
     networks:
       - mongo-net
+    depends_on:
+      keyfile-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
@@ -195,10 +247,15 @@ services:
       mongod --shardsvr --replSet rs2 --port 27018
       --dbpath /data/db --bind_ip_all
       --wiredTigerCacheSizeGB 0.5
+      --keyFile /keyfile/mongodb.key
     volumes:
       - shard2-3-data:/data/db
+      - keyfile-data:/keyfile:ro
     networks:
       - mongo-net
+    depends_on:
+      keyfile-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
@@ -207,9 +264,6 @@ services:
       retries: 20
       start_period: 60s
 
-  # ─────────────────────────────────────────────
-  # Shard 3 Replica Set  (rs3)
-  # ─────────────────────────────────────────────
   shard3-1:
     image: mongo:8.0
     container_name: shard3-1
@@ -218,10 +272,15 @@ services:
       mongod --shardsvr --replSet rs3 --port 27018
       --dbpath /data/db --bind_ip_all
       --wiredTigerCacheSizeGB 0.5
+      --keyFile /keyfile/mongodb.key
     volumes:
       - shard3-1-data:/data/db
+      - keyfile-data:/keyfile:ro
     networks:
       - mongo-net
+    depends_on:
+      keyfile-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
@@ -238,10 +297,15 @@ services:
       mongod --shardsvr --replSet rs3 --port 27018
       --dbpath /data/db --bind_ip_all
       --wiredTigerCacheSizeGB 0.5
+      --keyFile /keyfile/mongodb.key
     volumes:
       - shard3-2-data:/data/db
+      - keyfile-data:/keyfile:ro
     networks:
       - mongo-net
+    depends_on:
+      keyfile-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
@@ -258,10 +322,15 @@ services:
       mongod --shardsvr --replSet rs3 --port 27018
       --dbpath /data/db --bind_ip_all
       --wiredTigerCacheSizeGB 0.5
+      --keyFile /keyfile/mongodb.key
     volumes:
       - shard3-3-data:/data/db
+      - keyfile-data:/keyfile:ro
     networks:
       - mongo-net
+    depends_on:
+      keyfile-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
@@ -270,30 +339,35 @@ services:
       retries: 20
       start_period: 60s
 
-  # ─────────────────────────────────────────────
-  # mongos Router
-  # ─────────────────────────────────────────────
   mongos:
     image: mongo:8.0
     container_name: mongos
     hostname: mongos
     entrypoint: ["/bin/bash", "/scripts/mongos-entrypoint.sh"]
+    environment:
+      MONGO_ADMIN_USER: admin
+      MONGO_ADMIN_PASS: RestCluster2024!
+      MONGO_APP_USER: appuser
+      MONGO_APP_PASS: AppPass2024!
     volumes:
       - ./FunctionalSolution/scripts:/scripts:ro
       - ./Data:/csv-data:ro
+      - keyfile-data:/keyfile:ro
     ports:
       - "27017:27017"
     networks:
       - mongo-net
     depends_on:
-      - configsvr1
-      - configsvr2
-      - configsvr3
+      keyfile-init:
+        condition: service_completed_successfully
+      configsvr1:
+        condition: service_started
+      configsvr2:
+        condition: service_started
+      configsvr3:
+        condition: service_started
     restart: on-failure
 
-  # ─────────────────────────────────────────────
-  # MongoDB Compass Web UI
-  # ─────────────────────────────────────────────
   compass-web:
     image: haohanyang/compass-web:latest
     container_name: compass-web

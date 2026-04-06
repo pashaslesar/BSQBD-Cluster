@@ -1,5 +1,16 @@
 set -e
 
+# ── Credentials (injected via docker-compose environment) ────────────────────
+ADMIN_USER="${MONGO_ADMIN_USER:-admin}"
+ADMIN_PASS="${MONGO_ADMIN_PASS:-RestCluster2024!}"
+APP_USER="${MONGO_APP_USER:-appuser}"
+APP_PASS="${MONGO_APP_PASS:-AppPass2024!}"
+
+# Auth flags used after admin user is created (steps 4+)
+MAUTH="-u $ADMIN_USER -p $ADMIN_PASS --authenticationDatabase admin"
+
+# ── Helper functions ─────────────────────────────────────────────────────────
+
 wait_mongo() {
     local host=$1 port=$2
     echo "[wait] $host:$port ..."
@@ -12,9 +23,26 @@ wait_mongo() {
 
 rs_initialized() {
     local host=$1 port=$2
-    mongosh --host "$host" --port "$port" --quiet \
-        --eval "try { var s=rs.status(); print(s.ok===1?'yes':'no') } catch(e){ print('no') }" \
-        2>/dev/null | grep -q "^yes"
+    # rs.status() may throw auth error if admin user already exists (restart scenario).
+    # In that case we assume the RS is already initialized and skip re-init.
+    local output
+    output=$(mongosh --host "$host" --port "$port" --quiet \
+        --eval "try {
+            var s = rs.status();
+            print(s.ok === 1 ? 'yes' : 'no');
+        } catch(e) {
+            if (e.code === 13 || e.code === 18 ||
+                String(e).match(/auth|Unauthorized|not authorized/i)) {
+                print('skip');
+            } else {
+                print('no');
+            }
+        }" 2>/dev/null || echo "skip")
+    if echo "$output" | grep -q "^skip"; then
+        echo "[skip] $host:$port auth required — RS assumed already initialized"
+        return 0
+    fi
+    echo "$output" | grep -q "^yes"
 }
 
 wait_primary() {
@@ -147,17 +175,59 @@ echo "[ok]   mongos is up"
 
 echo ""
 echo "══════════════════════════════════════════"
+echo " STEP 3.5 – Create admin & app users"
+echo "══════════════════════════════════════════"
+
+# Use MongoDB localhost exception: before any admin users exist,
+# connections from localhost are allowed without credentials.
+# The setup script runs inside the mongos container → localhost:27017 works.
+
+if mongosh --host localhost --port 27017 --quiet $MAUTH \
+    --eval "db.adminCommand({ping:1})" >/dev/null 2>&1; then
+    echo "[skip] Admin user '$ADMIN_USER' already exists"
+else
+    echo "[create] Creating admin user via localhost exception ..."
+    mongosh --host localhost --port 27017 --quiet --eval "
+        db.getSiblingDB('admin').createUser({
+            user: '$ADMIN_USER',
+            pwd:  '$ADMIN_PASS',
+            roles: [{ role: 'root', db: 'admin' }]
+        });
+        print('[done] Admin user created: $ADMIN_USER');
+    "
+fi
+
+# Create application user with readWrite on restaurants db
+if mongosh --host localhost --port 27017 --quiet $MAUTH \
+    --eval "var u = db.getSiblingDB('restaurants').getUser('$APP_USER'); print(u ? 'exists' : 'none')" \
+    2>/dev/null | grep -q "^exists"; then
+    echo "[skip] App user '$APP_USER' already exists"
+else
+    echo "[create] Creating app user '$APP_USER' ..."
+    mongosh --host localhost --port 27017 --quiet $MAUTH --eval "
+        db.getSiblingDB('restaurants').createUser({
+            user: '$APP_USER',
+            pwd:  '$APP_PASS',
+            roles: [{ role: 'readWrite', db: 'restaurants' }]
+        });
+        print('[done] App user created: $APP_USER');
+    "
+fi
+
+
+echo ""
+echo "══════════════════════════════════════════"
 echo " STEP 4 – Add shards to mongos"
 echo "══════════════════════════════════════════"
 
-SHARD_COUNT=$(mongosh --host mongos --port 27017 --quiet \
+SHARD_COUNT=$(mongosh --host mongos --port 27017 --quiet $MAUTH \
     --eval "db.adminCommand({listShards:1}).shards.length" 2>/dev/null || echo "0")
 
 if [ "$SHARD_COUNT" -ge 3 ] 2>/dev/null; then
     echo "[skip] Shards already registered ($SHARD_COUNT)"
 else
     echo "[add]  Adding rs1, rs2, rs3 ..."
-    mongosh --host mongos --port 27017 --quiet --eval '
+    mongosh --host mongos --port 27017 --quiet $MAUTH --eval '
     sh.addShard("rs1/shard1-1:27018,shard1-2:27018,shard1-3:27018");
     sh.addShard("rs2/shard2-1:27018,shard2-2:27018,shard2-3:27018");
     sh.addShard("rs3/shard3-1:27018,shard3-2:27018,shard3-3:27018");
@@ -171,7 +241,7 @@ echo "════════════════════════�
 echo " STEP 5-7 – Database / collections / sharding"
 echo "══════════════════════════════════════════"
 
-mongosh --host mongos --port 27017 --quiet << 'EOJS'
+mongosh --host mongos --port 27017 --quiet $MAUTH << 'EOJS'
 
 // ── enable sharding on the database ──────────────────────────────────────────
 sh.enableSharding("restaurants");
@@ -330,6 +400,7 @@ echo ""
 echo "══════════════════════════════════════════"
 echo " STEP 8 – Import CSV data"
 echo "══════════════════════════════════════════"
+export MONGO_ADMIN_USER MONGO_ADMIN_PASS
 bash /scripts/import-data.sh
 
 echo ""
@@ -337,7 +408,7 @@ echo "════════════════════════�
 echo " STEP 9 – Apply JSON Schema validators"
 echo "══════════════════════════════════════════"
 
-mongosh --host mongos --port 27017 --quiet << 'EOJS'
+mongosh --host mongos --port 27017 --quiet $MAUTH << 'EOJS'
 var db = db.getSiblingDB("restaurants");
 
 // ── dubai_restaurants ─────────────────────────────────────────────────────────
@@ -427,6 +498,10 @@ echo ""
 echo "╔══════════════════════════════════════════╗"
 echo "║   Cluster setup complete!                ║"
 echo "║                                          ║"
-echo "║   mongosh:      localhost:27017          ║"
+echo "║   mongosh (admin):                       ║"
+echo "║     mongosh localhost:27017              ║"
+echo "║     -u admin -p RestCluster2024!         ║"
+echo "║     --authenticationDatabase admin       ║"
+echo "║                                          ║"
 echo "║   Compass Web:  http://localhost:8080    ║"
 echo "╚══════════════════════════════════════════╝"
