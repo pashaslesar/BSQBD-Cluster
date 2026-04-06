@@ -271,13 +271,31 @@ db.dubai_restaurants.createIndex( { subCategory: "hashed" } );
 db.usa_fastfood.createIndex(       { name:        "hashed" } );
 db.indian_restaurants.createIndex( { location:    "hashed" } );
 
-// Secondary indexes for query performance
+// ── single-field indexes ───────────────────────────────────────────────────────
 db.dubai_restaurants.createIndex( { polarity: 1 } );
 db.dubai_restaurants.createIndex( { location: 1 } );
+db.dubai_restaurants.createIndex( { category: 1 } );
 db.usa_fastfood.createIndex(       { province: 1 } );
 db.usa_fastfood.createIndex(       { city: 1 } );
+db.usa_fastfood.createIndex(       { name: 1 } );
 db.indian_restaurants.createIndex( { rating: 1 } );
 db.indian_restaurants.createIndex( { average_price: 1 } );
+
+// ── compound indexes (for analytical queries) ──────────────────────────────────
+db.dubai_restaurants.createIndex( { category: 1, polarity: -1 } );
+db.dubai_restaurants.createIndex( { location: 1, subCategory: 1 } );
+db.usa_fastfood.createIndex(       { province: 1, city: 1 } );
+db.usa_fastfood.createIndex(       { name: 1, province: 1 } );
+db.indian_restaurants.createIndex( { location: 1, rating: -1 } );
+db.indian_restaurants.createIndex( { rating: -1, average_price: 1 } );
+
+// ── text indexes (full-text search) ───────────────────────────────────────────
+db.dubai_restaurants.createIndex( { name: "text", category: "text", subCategory: "text" } );
+db.usa_fastfood.createIndex(       { name: "text", city: "text" } );
+db.indian_restaurants.createIndex( { restaurant_name: "text", location: "text" } );
+
+// ── geospatial index (dubai has lat/lng coordinates) ──────────────────────────
+db.dubai_restaurants.createIndex( { lat: 1, lng: 1 } );
 
 // ── shard the collections ─────────────────────────────────────────────────────
 // subCategory – distributes Dubai restaurants by restaurant type
