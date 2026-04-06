@@ -180,96 +180,103 @@ var db = db.getSiblingDB("restaurants");
 var cols = db.getCollectionNames();
 
 // ── dubai_restaurants ─────────────────────────────────────────────────────────
+// required: only fields that are ALWAYS filled in the CSV (7342 rows analysed)
 if (!cols.includes("dubai_restaurants")) {
     db.createCollection("dubai_restaurants", {
         validator: {
             $jsonSchema: {
                 bsonType: "object",
-                required: ["name", "location", "category"],
+                required: ["name", "category", "location", "lat", "lng", "originalId", "polarity"],
                 properties: {
-                    name:        { bsonType: "string",             description: "Restaurant name – required" },
-                    location:    { bsonType: "string",             description: "City/area – required" },
-                    category:    { bsonType: "string",             description: "Top-level category – required" },
-                    address:     { bsonType: ["string","null"] },
-                    id:          { bsonType: ["int","double","null"] },
-                    lat:         { bsonType: ["double","null"] },
-                    lng:         { bsonType: ["double","null"] },
-                    polarity:    { bsonType: ["int","double","null"] },
-                    subCategory: { bsonType: ["string","null"] },
-                    originalId:  { bsonType: ["string","null"] },
-                    details:     { bsonType: ["string","null"] },
-                    reviews:     { bsonType: ["string","null"] }
+                    name:        { bsonType: "string" },
+                    category:    { bsonType: "string" },
+                    location:    { bsonType: "string" },
+                    originalId:  { bsonType: "string" },
+                    lat:         { bsonType: ["double", "int"] },
+                    lng:         { bsonType: ["double", "int"] },
+                    polarity:    { bsonType: ["double", "int"] },
+                    address:     { bsonType: ["string", "null"] },
+                    id:          { bsonType: ["double", "int", "null"] },
+                    subCategory: { bsonType: ["string", "null"] },
+                    details:     { bsonType: ["string", "null"] },
+                    reviews:     { bsonType: ["string", "null"] }
                 }
             }
         },
         validationAction: "warn"
     });
-    print("[done] dubai_restaurants collection created");
+    print("[done] dubai_restaurants created (validator: warn)");
 } else {
     print("[skip] dubai_restaurants already exists");
 }
 
 // ── usa_fastfood ──────────────────────────────────────────────────────────────
+// required: all fields except websites (465 empty rows)
 if (!cols.includes("usa_fastfood")) {
     db.createCollection("usa_fastfood", {
         validator: {
             $jsonSchema: {
                 bsonType: "object",
-                required: ["name", "city", "country"],
+                required: ["name", "address", "city", "country", "keys", "latitude", "longitude", "postalCode", "province"],
                 properties: {
-                    name:       { bsonType: "string", description: "Chain name – required" },
-                    city:       { bsonType: "string", description: "City – required" },
-                    country:    { bsonType: "string", description: "Country code – required" },
-                    address:    { bsonType: ["string","null"] },
-                    province:   { bsonType: ["string","null"] },
-                    postalCode: { bsonType: ["string","null"] },
-                    keys:       { bsonType: ["string","null"] },
-                    latitude:   { bsonType: ["double","null"] },
-                    longitude:  { bsonType: ["double","null"] },
-                    websites:   { bsonType: ["string","null"] }
+                    name:       { bsonType: "string" },
+                    address:    { bsonType: "string" },
+                    city:       { bsonType: "string" },
+                    country:    { bsonType: "string" },
+                    keys:       { bsonType: "string" },
+                    postalCode: { bsonType: "string" },
+                    province:   { bsonType: "string" },
+                    latitude:   { bsonType: ["double", "int"] },
+                    longitude:  { bsonType: ["double", "int"] },
+                    websites:   { bsonType: ["string", "null"] }
                 }
             }
         },
         validationAction: "warn"
     });
-    print("[done] usa_fastfood collection created");
+    print("[done] usa_fastfood created (validator: warn)");
 } else {
     print("[skip] usa_fastfood already exists");
 }
 
 // ── indian_restaurants ────────────────────────────────────────────────────────
+// required: all 11 fields — every field is always filled (27656 rows analysed)
 if (!cols.includes("indian_restaurants")) {
     db.createCollection("indian_restaurants", {
         validator: {
             $jsonSchema: {
                 bsonType: "object",
-                required: ["restaurant_name", "location"],
+                required: [
+                    "restaurant_name", "location", "rating", "average_price",
+                    "average_delivery_time", "south_indian_or_not", "north_indian_or_not",
+                    "fast_food_or_not", "street_food", "biryani_or_not", "bakery_or_not"
+                ],
                 properties: {
-                    restaurant_name:       { bsonType: "string", description: "Name – required" },
-                    location:              { bsonType: "string", description: "Location – required" },
-                    rating:                { bsonType: ["double","int","null"] },
-                    average_price:         { bsonType: ["double","int","null"] },
-                    average_delivery_time: { bsonType: ["double","int","null"] },
-                    south_indian_or_not:   { bsonType: ["int","double","null"] },
-                    north_indian_or_not:   { bsonType: ["int","double","null"] },
-                    fast_food_or_not:      { bsonType: ["int","double","null"] },
-                    street_food:           { bsonType: ["int","double","null"] },
-                    biryani_or_not:        { bsonType: ["int","double","null"] },
-                    bakery_or_not:         { bsonType: ["int","double","null"] }
+                    restaurant_name:       { bsonType: "string" },
+                    location:              { bsonType: "string" },
+                    rating:                { bsonType: ["double", "int"] },
+                    average_price:         { bsonType: ["double", "int"] },
+                    average_delivery_time: { bsonType: ["double", "int"] },
+                    south_indian_or_not:   { bsonType: ["double", "int"] },
+                    north_indian_or_not:   { bsonType: ["double", "int"] },
+                    fast_food_or_not:      { bsonType: ["double", "int"] },
+                    street_food:           { bsonType: ["double", "int"] },
+                    biryani_or_not:        { bsonType: ["double", "int"] },
+                    bakery_or_not:         { bsonType: ["double", "int"] }
                 }
             }
         },
         validationAction: "warn"
     });
-    print("[done] indian_restaurants collection created");
+    print("[done] indian_restaurants created (validator: warn)");
 } else {
     print("[skip] indian_restaurants already exists");
 }
 
 // ── hashed indexes (required before sharding) ─────────────────────────────────
-db.dubai_restaurants.createIndex( { subCategory: "hashed" } );
-db.usa_fastfood.createIndex(       { name:        "hashed" } );
-db.indian_restaurants.createIndex( { location:    "hashed" } );
+db.dubai_restaurants.createIndex( { name: "hashed" } );
+db.usa_fastfood.createIndex(       { name: "hashed" } );
+db.indian_restaurants.createIndex( { location: "hashed" } );
 
 // ── single-field indexes ───────────────────────────────────────────────────────
 db.dubai_restaurants.createIndex( { polarity: 1 } );
@@ -298,8 +305,8 @@ db.indian_restaurants.createIndex( { restaurant_name: "text", location: "text" }
 db.dubai_restaurants.createIndex( { lat: 1, lng: 1 } );
 
 // ── shard the collections ─────────────────────────────────────────────────────
-// subCategory – distributes Dubai restaurants by restaurant type
-sh.shardCollection("restaurants.dubai_restaurants", { subCategory: "hashed" });
+// name – distributes Dubai restaurants by name (high cardinality → even distribution)
+sh.shardCollection("restaurants.dubai_restaurants", { name: "hashed" });
 // name – distributes US fast-food by chain name (McDonald's, Wendy's …)
 sh.shardCollection("restaurants.usa_fastfood",      { name: "hashed" });
 // location – distributes Indian restaurants by city
@@ -326,8 +333,99 @@ echo "════════════════════════�
 bash /scripts/import-data.sh
 
 echo ""
+echo "══════════════════════════════════════════"
+echo " STEP 9 – Apply JSON Schema validators"
+echo "══════════════════════════════════════════"
+
+mongosh --host mongos --port 27017 --quiet << 'EOJS'
+var db = db.getSiblingDB("restaurants");
+
+// ── dubai_restaurants ─────────────────────────────────────────────────────────
+db.runCommand({
+    collMod: "dubai_restaurants",
+    validator: {
+        $jsonSchema: {
+            bsonType: "object",
+            required: ["name", "category", "location", "lat", "lng", "originalId", "polarity"],
+            properties: {
+                name:        { bsonType: "string" },
+                category:    { bsonType: "string" },
+                location:    { bsonType: "string" },
+                originalId:  { bsonType: "string" },
+                lat:         { bsonType: ["double", "int"] },
+                lng:         { bsonType: ["double", "int"] },
+                polarity:    { bsonType: ["double", "int"] },
+                address:     { bsonType: ["string", "null"] },
+                id:          { bsonType: ["double", "int", "null"] },
+                subCategory: { bsonType: ["string", "null"] },
+                details:     { bsonType: ["string", "null"] },
+                reviews:     { bsonType: ["string", "null"] }
+            }
+        }
+    },
+    validationAction: "error"
+});
+print("[done] dubai_restaurants validator → error");
+
+// ── usa_fastfood ──────────────────────────────────────────────────────────────
+db.runCommand({
+    collMod: "usa_fastfood",
+    validator: {
+        $jsonSchema: {
+            bsonType: "object",
+            required: ["name", "address", "city", "country", "keys", "latitude", "longitude", "postalCode", "province"],
+            properties: {
+                name:       { bsonType: "string" },
+                address:    { bsonType: "string" },
+                city:       { bsonType: "string" },
+                country:    { bsonType: "string" },
+                keys:       { bsonType: "string" },
+                postalCode: { bsonType: "string" },
+                province:   { bsonType: "string" },
+                latitude:   { bsonType: ["double", "int"] },
+                longitude:  { bsonType: ["double", "int"] },
+                websites:   { bsonType: ["string", "null"] }
+            }
+        }
+    },
+    validationAction: "error"
+});
+print("[done] usa_fastfood validator → error");
+
+// ── indian_restaurants ────────────────────────────────────────────────────────
+db.runCommand({
+    collMod: "indian_restaurants",
+    validator: {
+        $jsonSchema: {
+            bsonType: "object",
+            required: [
+                "restaurant_name", "location", "rating", "average_price",
+                "average_delivery_time", "south_indian_or_not", "north_indian_or_not",
+                "fast_food_or_not", "street_food", "biryani_or_not", "bakery_or_not"
+            ],
+            properties: {
+                restaurant_name:       { bsonType: "string" },
+                location:              { bsonType: "string" },
+                rating:                { bsonType: ["double", "int"] },
+                average_price:         { bsonType: ["double", "int"] },
+                average_delivery_time: { bsonType: ["double", "int"] },
+                south_indian_or_not:   { bsonType: ["double", "int"] },
+                north_indian_or_not:   { bsonType: ["double", "int"] },
+                fast_food_or_not:      { bsonType: ["double", "int"] },
+                street_food:           { bsonType: ["double", "int"] },
+                biryani_or_not:        { bsonType: ["double", "int"] },
+                bakery_or_not:         { bsonType: ["double", "int"] }
+            }
+        }
+    },
+    validationAction: "error"
+});
+print("[done] indian_restaurants validator → error");
+EOJS
+
+echo ""
 echo "╔══════════════════════════════════════════╗"
-echo "║   Cluster setup complete!               ║"
+echo "║   Cluster setup complete!                ║"
 echo "║                                          ║"
 echo "║   mongosh:      localhost:27017          ║"
 echo "║   Compass Web:  http://localhost:8080    ║"
