@@ -290,12 +290,6 @@ services:
       - configsvr2
       - configsvr3
     restart: on-failure
-    healthcheck:
-      test: ["CMD", "mongosh", "--port", "27017", "--quiet", "--eval", "db.adminCommand({ping:1})"]
-      interval: 15s
-      timeout: 15s
-      retries: 30
-      start_period: 60s
 
   # ─────────────────────────────────────────────
   # MongoDB Compass Web UI
