@@ -19,6 +19,11 @@ volumes:
 
 services:
 
+  # ─────────────────────────────────────────────
+  # Keyfile generator  (runs once, then exits)
+  # Generates a random 756-byte base64 keyfile for
+  # MongoDB internal cluster authentication (keyFile).
+  # ─────────────────────────────────────────────
   keyfile-init:
     image: mongo:8.0
     container_name: keyfile-init
@@ -39,6 +44,9 @@ services:
       - mongo-net
     restart: "no"
 
+  # ─────────────────────────────────────────────
+  # Config Server Replica Set  (csrs)
+  # ─────────────────────────────────────────────
   configsvr1:
     image: mongo:8.0
     container_name: configsvr1
@@ -114,6 +122,9 @@ services:
       retries: 20
       start_period: 60s
 
+  # ─────────────────────────────────────────────
+  # Shard 1 Replica Set  (rs1)
+  # ─────────────────────────────────────────────
   shard1-1:
     image: mongo:8.0
     container_name: shard1-1
@@ -189,6 +200,9 @@ services:
       retries: 20
       start_period: 60s
 
+  # ─────────────────────────────────────────────
+  # Shard 2 Replica Set  (rs2)
+  # ─────────────────────────────────────────────
   shard2-1:
     image: mongo:8.0
     container_name: shard2-1
@@ -264,6 +278,9 @@ services:
       retries: 20
       start_period: 60s
 
+  # ─────────────────────────────────────────────
+  # Shard 3 Replica Set  (rs3)
+  # ─────────────────────────────────────────────
   shard3-1:
     image: mongo:8.0
     container_name: shard3-1
@@ -339,6 +356,181 @@ services:
       retries: 20
       start_period: 60s
 
+  # ─────────────────────────────────────────────
+  # Replica Set Init Containers
+  #
+  # Problem: rs.initiate() requires the localhost exception (MongoDB keyFile),
+  # but setup-cluster.sh runs inside mongos — a different container from the
+  # shard/configsvr nodes.  To call rs.initiate() from "localhost" of each
+  # primary, these init containers share the network namespace of their primary
+  # via  network_mode: "service:<primary>".  That makes localhost:PORT resolve
+  # to the primary's own mongod, so the localhost exception applies.
+  # ─────────────────────────────────────────────
+  csrs-init:
+    image: mongo:8.0
+    container_name: csrs-init
+    network_mode: "service:configsvr1"
+    command: >
+      bash -c "
+        until mongosh --port 27019 --quiet --eval 'db.adminCommand({ping:1})' >/dev/null 2>&1; do sleep 2; done &&
+        mongosh --port 27019 --quiet --eval '
+          try {
+            rs.status();
+            print(\"[skip] csrs already initialized\");
+          } catch(e) {
+            var s = String(e);
+            if (s.match(/auth|Unauthorized|not authorized/i) || e.code === 13 || e.code === 18) {
+              print(\"[skip] csrs: users exist, RS assumed initialized\");
+            } else {
+              rs.initiate({
+                _id: \"csrs\",
+                configsvr: true,
+                members: [
+                  { _id: 0, host: \"configsvr1:27019\", priority: 2 },
+                  { _id: 1, host: \"configsvr2:27019\", priority: 1 },
+                  { _id: 2, host: \"configsvr3:27019\", priority: 1 }
+                ]
+              });
+              print(\"[done] csrs initialized\");
+            }
+          }
+        '
+      "
+    depends_on:
+      keyfile-init:
+        condition: service_completed_successfully
+      configsvr1:
+        condition: service_healthy
+      configsvr2:
+        condition: service_healthy
+      configsvr3:
+        condition: service_healthy
+    restart: "no"
+
+  rs1-init:
+    image: mongo:8.0
+    container_name: rs1-init
+    network_mode: "service:shard1-1"
+    command: >
+      bash -c "
+        until mongosh --port 27018 --quiet --eval 'db.adminCommand({ping:1})' >/dev/null 2>&1; do sleep 2; done &&
+        mongosh --port 27018 --quiet --eval '
+          try {
+            rs.status();
+            print(\"[skip] rs1 already initialized\");
+          } catch(e) {
+            var s = String(e);
+            if (s.match(/auth|Unauthorized|not authorized/i) || e.code === 13 || e.code === 18) {
+              print(\"[skip] rs1: users exist, RS assumed initialized\");
+            } else {
+              rs.initiate({
+                _id: \"rs1\",
+                members: [
+                  { _id: 0, host: \"shard1-1:27018\", priority: 2 },
+                  { _id: 1, host: \"shard1-2:27018\", priority: 1 },
+                  { _id: 2, host: \"shard1-3:27018\", priority: 1 }
+                ]
+              });
+              print(\"[done] rs1 initialized\");
+            }
+          }
+        '
+      "
+    depends_on:
+      keyfile-init:
+        condition: service_completed_successfully
+      shard1-1:
+        condition: service_healthy
+      shard1-2:
+        condition: service_healthy
+      shard1-3:
+        condition: service_healthy
+    restart: "no"
+
+  rs2-init:
+    image: mongo:8.0
+    container_name: rs2-init
+    network_mode: "service:shard2-1"
+    command: >
+      bash -c "
+        until mongosh --port 27018 --quiet --eval 'db.adminCommand({ping:1})' >/dev/null 2>&1; do sleep 2; done &&
+        mongosh --port 27018 --quiet --eval '
+          try {
+            rs.status();
+            print(\"[skip] rs2 already initialized\");
+          } catch(e) {
+            var s = String(e);
+            if (s.match(/auth|Unauthorized|not authorized/i) || e.code === 13 || e.code === 18) {
+              print(\"[skip] rs2: users exist, RS assumed initialized\");
+            } else {
+              rs.initiate({
+                _id: \"rs2\",
+                members: [
+                  { _id: 0, host: \"shard2-1:27018\", priority: 2 },
+                  { _id: 1, host: \"shard2-2:27018\", priority: 1 },
+                  { _id: 2, host: \"shard2-3:27018\", priority: 1 }
+                ]
+              });
+              print(\"[done] rs2 initialized\");
+            }
+          }
+        '
+      "
+    depends_on:
+      keyfile-init:
+        condition: service_completed_successfully
+      shard2-1:
+        condition: service_healthy
+      shard2-2:
+        condition: service_healthy
+      shard2-3:
+        condition: service_healthy
+    restart: "no"
+
+  rs3-init:
+    image: mongo:8.0
+    container_name: rs3-init
+    network_mode: "service:shard3-1"
+    command: >
+      bash -c "
+        until mongosh --port 27018 --quiet --eval 'db.adminCommand({ping:1})' >/dev/null 2>&1; do sleep 2; done &&
+        mongosh --port 27018 --quiet --eval '
+          try {
+            rs.status();
+            print(\"[skip] rs3 already initialized\");
+          } catch(e) {
+            var s = String(e);
+            if (s.match(/auth|Unauthorized|not authorized/i) || e.code === 13 || e.code === 18) {
+              print(\"[skip] rs3: users exist, RS assumed initialized\");
+            } else {
+              rs.initiate({
+                _id: \"rs3\",
+                members: [
+                  { _id: 0, host: \"shard3-1:27018\", priority: 2 },
+                  { _id: 1, host: \"shard3-2:27018\", priority: 1 },
+                  { _id: 2, host: \"shard3-3:27018\", priority: 1 }
+                ]
+              });
+              print(\"[done] rs3 initialized\");
+            }
+          }
+        '
+      "
+    depends_on:
+      keyfile-init:
+        condition: service_completed_successfully
+      shard3-1:
+        condition: service_healthy
+      shard3-2:
+        condition: service_healthy
+      shard3-3:
+        condition: service_healthy
+    restart: "no"
+
+  # ─────────────────────────────────────────────
+  # mongos Router
+  # Starts only after all 4 RS init containers complete successfully.
+  # ─────────────────────────────────────────────
   mongos:
     image: mongo:8.0
     container_name: mongos
@@ -358,16 +550,19 @@ services:
     networks:
       - mongo-net
     depends_on:
-      keyfile-init:
+      csrs-init:
         condition: service_completed_successfully
-      configsvr1:
-        condition: service_started
-      configsvr2:
-        condition: service_started
-      configsvr3:
-        condition: service_started
+      rs1-init:
+        condition: service_completed_successfully
+      rs2-init:
+        condition: service_completed_successfully
+      rs3-init:
+        condition: service_completed_successfully
     restart: on-failure
 
+  # ─────────────────────────────────────────────
+  # MongoDB Compass Web UI
+  # ─────────────────────────────────────────────
   compass-web:
     image: haohanyang/compass-web:latest
     container_name: compass-web

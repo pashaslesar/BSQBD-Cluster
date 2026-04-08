@@ -6,7 +6,7 @@ ADMIN_PASS="${MONGO_ADMIN_PASS:-RestCluster2024!}"
 APP_USER="${MONGO_APP_USER:-appuser}"
 APP_PASS="${MONGO_APP_PASS:-AppPass2024!}"
 
-# Auth flags used after admin user is created (steps 4+)
+# Auth flags used after admin user is created (steps 3.5+)
 MAUTH="-u $ADMIN_USER -p $ADMIN_PASS --authenticationDatabase admin"
 
 # ── Helper functions ─────────────────────────────────────────────────────────
@@ -21,30 +21,6 @@ wait_mongo() {
     echo "[ok]   $host:$port is reachable"
 }
 
-rs_initialized() {
-    local host=$1 port=$2
-    # rs.status() may throw auth error if admin user already exists (restart scenario).
-    # In that case we assume the RS is already initialized and skip re-init.
-    local output
-    output=$(mongosh --host "$host" --port "$port" --quiet \
-        --eval "try {
-            var s = rs.status();
-            print(s.ok === 1 ? 'yes' : 'no');
-        } catch(e) {
-            if (e.code === 13 || e.code === 18 ||
-                String(e).match(/auth|Unauthorized|not authorized/i)) {
-                print('skip');
-            } else {
-                print('no');
-            }
-        }" 2>/dev/null || echo "skip")
-    if echo "$output" | grep -q "^skip"; then
-        echo "[skip] $host:$port auth required — RS assumed already initialized"
-        return 0
-    fi
-    echo "$output" | grep -q "^yes"
-}
-
 wait_primary() {
     local host=$1 port=$2
     echo "[wait] primary on $host:$port ..."
@@ -57,117 +33,26 @@ wait_primary() {
 }
 
 
+# ── RS init is handled by csrs-init / rs1-init / rs2-init / rs3-init ─────────
+# Those containers share the network namespace of their primary via
+# network_mode: "service:<primary>", so rs.initiate() runs from localhost
+# and the MongoDB keyFile localhost exception applies.
+# mongos depends_on all 4 init containers, so by the time this script runs
+# the replica sets are already initialized.  We just wait for primary elections.
+
 echo ""
 echo "══════════════════════════════════════════"
-echo " STEP 1 – Config Server Replica Set (csrs)"
+echo " STEP 1 – Wait for replica set primaries"
 echo "══════════════════════════════════════════"
-
-wait_mongo configsvr1 27019
-wait_mongo configsvr2 27019
-wait_mongo configsvr3 27019
-
-if rs_initialized configsvr1 27019; then
-    echo "[skip] csrs already initialized"
-else
-    echo "[init] Initializing csrs ..."
-    mongosh --host configsvr1 --port 27019 --quiet --eval '
-    rs.initiate({
-        _id: "csrs",
-        configsvr: true,
-        members: [
-            { _id: 0, host: "configsvr1:27019", priority: 2 },
-            { _id: 1, host: "configsvr2:27019", priority: 1 },
-            { _id: 2, host: "configsvr3:27019", priority: 1 }
-        ]
-    })
-    '
-    echo "[done] csrs initiated"
-fi
-
 wait_primary configsvr1 27019
-
-# rs1
-echo ""
-echo "══════════════════════════════════════════"
-echo " STEP 2a – Shard RS: rs1"
-echo "══════════════════════════════════════════"
-wait_mongo shard1-1 27018
-wait_mongo shard1-2 27018
-wait_mongo shard1-3 27018
-if rs_initialized shard1-1 27018; then
-    echo "[skip] rs1 already initialized"
-else
-    echo "[init] Initializing rs1 ..."
-    mongosh --host shard1-1 --port 27018 --quiet --eval '
-    rs.initiate({
-        _id: "rs1",
-        members: [
-            { _id: 0, host: "shard1-1:27018", priority: 2 },
-            { _id: 1, host: "shard1-2:27018", priority: 1 },
-            { _id: 2, host: "shard1-3:27018", priority: 1 }
-        ]
-    })
-    '
-    echo "[done] rs1 initiated"
-fi
-wait_primary shard1-1 27018
-
-# rs2
-echo ""
-echo "══════════════════════════════════════════"
-echo " STEP 2b – Shard RS: rs2"
-echo "══════════════════════════════════════════"
-wait_mongo shard2-1 27018
-wait_mongo shard2-2 27018
-wait_mongo shard2-3 27018
-if rs_initialized shard2-1 27018; then
-    echo "[skip] rs2 already initialized"
-else
-    echo "[init] Initializing rs2 ..."
-    mongosh --host shard2-1 --port 27018 --quiet --eval '
-    rs.initiate({
-        _id: "rs2",
-        members: [
-            { _id: 0, host: "shard2-1:27018", priority: 2 },
-            { _id: 1, host: "shard2-2:27018", priority: 1 },
-            { _id: 2, host: "shard2-3:27018", priority: 1 }
-        ]
-    })
-    '
-    echo "[done] rs2 initiated"
-fi
-wait_primary shard2-1 27018
-
-# rs3
-echo ""
-echo "══════════════════════════════════════════"
-echo " STEP 2c – Shard RS: rs3"
-echo "══════════════════════════════════════════"
-wait_mongo shard3-1 27018
-wait_mongo shard3-2 27018
-wait_mongo shard3-3 27018
-if rs_initialized shard3-1 27018; then
-    echo "[skip] rs3 already initialized"
-else
-    echo "[init] Initializing rs3 ..."
-    mongosh --host shard3-1 --port 27018 --quiet --eval '
-    rs.initiate({
-        _id: "rs3",
-        members: [
-            { _id: 0, host: "shard3-1:27018", priority: 2 },
-            { _id: 1, host: "shard3-2:27018", priority: 1 },
-            { _id: 2, host: "shard3-3:27018", priority: 1 }
-        ]
-    })
-    '
-    echo "[done] rs3 initiated"
-fi
-wait_primary shard3-1 27018
+wait_primary shard1-1   27018
+wait_primary shard2-1   27018
+wait_primary shard3-1   27018
 
 
 echo ""
 echo "══════════════════════════════════════════"
-echo " STEP 3 – Wait for mongos"
+echo " STEP 2 – Wait for mongos"
 echo "══════════════════════════════════════════"
 wait_mongo mongos 27017
 echo "[ok]   mongos is up"
@@ -175,12 +60,12 @@ echo "[ok]   mongos is up"
 
 echo ""
 echo "══════════════════════════════════════════"
-echo " STEP 3.5 – Create admin & app users"
+echo " STEP 3 – Create admin & app users"
 echo "══════════════════════════════════════════"
 
 # Use MongoDB localhost exception: before any admin users exist,
 # connections from localhost are allowed without credentials.
-# The setup script runs inside the mongos container → localhost:27017 works.
+# This script runs inside the mongos container → localhost:27017 works.
 
 if mongosh --host localhost --port 27017 --quiet $MAUTH \
     --eval "db.adminCommand({ping:1})" >/dev/null 2>&1; then
@@ -197,7 +82,6 @@ else
     "
 fi
 
-# Create application user with readWrite on restaurants db
 if mongosh --host localhost --port 27017 --quiet $MAUTH \
     --eval "var u = db.getSiblingDB('restaurants').getUser('$APP_USER'); print(u ? 'exists' : 'none')" \
     2>/dev/null | grep -q "^exists"; then
@@ -375,11 +259,8 @@ db.indian_restaurants.createIndex( { restaurant_name: "text", location: "text" }
 db.dubai_restaurants.createIndex( { lat: 1, lng: 1 } );
 
 // ── shard the collections ─────────────────────────────────────────────────────
-// name – distributes Dubai restaurants by name (high cardinality → even distribution)
 sh.shardCollection("restaurants.dubai_restaurants", { name: "hashed" });
-// name – distributes US fast-food by chain name (McDonald's, Wendy's …)
 sh.shardCollection("restaurants.usa_fastfood",      { name: "hashed" });
-// location – distributes Indian restaurants by city
 sh.shardCollection("restaurants.indian_restaurants", { location: "hashed" });
 
 print("[done] All collections sharded");
@@ -496,7 +377,7 @@ EOJS
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
-echo "║   Cluster setup complete!                ║"
+echo "║   Information                            ║"
 echo "║                                          ║"
 echo "║   mongosh (admin):                       ║"
 echo "║     mongosh localhost:27017              ║"
@@ -505,3 +386,6 @@ echo "║     --authenticationDatabase admin       ║"
 echo "║                                          ║"
 echo "║   Compass Web:  http://localhost:8080    ║"
 echo "╚══════════════════════════════════════════╝"
+echo ""
+echo ""
+echo "Cluster setup complete"
