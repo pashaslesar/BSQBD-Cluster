@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')  # no display needed — saves to PNG files
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import warnings
@@ -14,18 +14,25 @@ plt.rcParams['axes.spines.right'] = False
 import os
 OUT = os.path.dirname(os.path.abspath(__file__))
 
-# ── Load data ─────────────────────────────────────────────────────────────────
 dubai = pd.read_csv(os.path.join(OUT, 'dubai-restaurants.csv'))
 usa   = pd.read_csv(os.path.join(OUT, 'fastfood-usa-restaurants.csv'))
 india = pd.read_csv(os.path.join(OUT, 'indian-restaurants.csv'), encoding='utf-8-sig')
 india = india.rename(columns=lambda c: c.strip().replace(' ', ''))
+
+for col in ['lat','lng','polarity']:
+    dubai[col] = pd.to_numeric(dubai[col], errors='coerce')
+for col in ['latitude','longitude']:
+    usa[col] = pd.to_numeric(usa[col], errors='coerce')
+for col in ['rating','average_price','average_delivery_time',
+            'south_indian_or_not','north_indian_or_not','fast_food_or_not',
+            'street_food','biryani_or_not','bakery_or_not']:
+    india[col] = pd.to_numeric(india[col], errors='coerce')
 
 print(f'Dubai:  {len(dubai):>6} rows  |  {dubai.shape[1]} columns')
 print(f'USA:    {len(usa):>6} rows  |  {usa.shape[1]} columns')
 print(f'India:  {len(india):>6} rows  |  {india.shape[1]} columns')
 print(f'Total:  {len(dubai)+len(usa)+len(india):>6} rows')
 
-# ── Missing values ────────────────────────────────────────────────────────────
 def missing_report(df, name):
     total = len(df)
     miss  = df.isnull().sum()
@@ -56,7 +63,6 @@ plt.tight_layout()
 plt.savefig(os.path.join(OUT, 'missing_values.png'), bbox_inches='tight')
 print('\n[saved] missing_values.png')
 
-# ── Basic stats ───────────────────────────────────────────────────────────────
 print('\n=== DUBAI — describe ===')
 print(dubai[['lat','lng','polarity']].describe().round(4).to_string())
 print('\n=== USA — describe ===')
@@ -65,7 +71,6 @@ print('\n=== INDIA — describe ===')
 print(india[['rating','average_price','average_delivery_time']].describe().round(4).to_string())
 print(f'\nDuplicates — Dubai: {dubai.duplicated().sum()}  USA: {usa.duplicated().sum()}  India: {india.duplicated().sum()}')
 
-# ── Dubai categories ──────────────────────────────────────────────────────────
 top_cat = dubai['category'].value_counts().head(15)
 fig, ax = plt.subplots(figsize=(12, 5))
 top_cat.sort_values().plot(kind='barh', ax=ax, color='#e07b54', edgecolor='white')
@@ -75,7 +80,6 @@ for bar in ax.patches:
 plt.tight_layout(); plt.savefig(os.path.join(OUT, 'dubai_categories.png'), bbox_inches='tight')
 print('[saved] dubai_categories.png')
 
-# ── Dubai polarity ────────────────────────────────────────────────────────────
 fig, axes = plt.subplots(1, 2, figsize=(13, 4))
 dubai['polarity'].plot(kind='hist', bins=40, ax=axes[0], color='#e07b54', edgecolor='white')
 axes[0].set_title('Dubai — distribuce polarity (sentimentu)')
@@ -89,7 +93,6 @@ plt.tight_layout(); plt.savefig(os.path.join(OUT, 'dubai_polarity.png'), bbox_in
 neg = (dubai['polarity']<0).sum(); zero = (dubai['polarity']==0).sum(); pos = (dubai['polarity']>0).sum()
 print(f'[saved] dubai_polarity.png  | neg={neg} ({neg/len(dubai)*100:.1f}%)  zero={zero}  pos={pos} ({pos/len(dubai)*100:.1f}%)')
 
-# ── Dubai geo scatter ─────────────────────────────────────────────────────────
 fig, ax = plt.subplots(figsize=(10, 7))
 sc = ax.scatter(dubai['lng'], dubai['lat'], c=dubai['polarity'], cmap='RdYlGn', s=4, alpha=0.5, vmin=-1, vmax=1)
 plt.colorbar(sc, ax=ax, label='Polarity')
@@ -98,7 +101,6 @@ ax.set_xlabel('Longitude'); ax.set_ylabel('Latitude')
 plt.tight_layout(); plt.savefig(os.path.join(OUT, 'dubai_geo.png'), bbox_inches='tight')
 print('[saved] dubai_geo.png')
 
-# ── USA chains ────────────────────────────────────────────────────────────────
 top_chains = usa['name'].value_counts().head(20)
 fig, ax = plt.subplots(figsize=(12, 6))
 top_chains.sort_values().plot(kind='barh', ax=ax, color='#5b8db8', edgecolor='white')
@@ -108,7 +110,6 @@ for bar in ax.patches:
 plt.tight_layout(); plt.savefig(os.path.join(OUT, 'usa_chains.png'), bbox_inches='tight')
 print(f'[saved] usa_chains.png  | unique chains: {usa["name"].nunique()}')
 
-# ── USA states ────────────────────────────────────────────────────────────────
 top_states = usa['province'].value_counts().head(15)
 fig, ax = plt.subplots(figsize=(12, 5))
 top_states.sort_values().plot(kind='barh', ax=ax, color='#3a6b96', edgecolor='white')
@@ -118,7 +119,6 @@ for bar in ax.patches:
 plt.tight_layout(); plt.savefig(os.path.join(OUT, 'usa_states.png'), bbox_inches='tight')
 print('[saved] usa_states.png')
 
-# ── USA chains × states stacked bar ──────────────────────────────────────────
 top5_states = usa['province'].value_counts().head(5).index
 top5_chains = usa['name'].value_counts().head(8).index
 pivot = (usa[usa['province'].isin(top5_states) & usa['name'].isin(top5_chains)]
@@ -129,7 +129,6 @@ plt.xticks(rotation=0); plt.legend(bbox_to_anchor=(1.01,1), loc='upper left', fo
 plt.tight_layout(); plt.savefig(os.path.join(OUT, 'usa_chains_by_state.png'), bbox_inches='tight')
 print('[saved] usa_chains_by_state.png')
 
-# ── India rating & price ──────────────────────────────────────────────────────
 fig, axes = plt.subplots(1, 2, figsize=(13, 4))
 india['rating'].plot(kind='hist', bins=30, ax=axes[0], color='#6aaa64', edgecolor='white')
 axes[0].set_title('India — distribuce hodnocení (rating)'); axes[0].set_xlabel('Rating'); axes[0].set_ylabel('Počet')
@@ -142,7 +141,6 @@ axes[1].legend()
 plt.tight_layout(); plt.savefig(os.path.join(OUT, 'india_rating_price.png'), bbox_inches='tight')
 print('[saved] india_rating_price.png')
 
-# ── India delivery time ───────────────────────────────────────────────────────
 fig, ax = plt.subplots(figsize=(10, 4))
 india['average_delivery_time'].plot(kind='hist', bins=35, ax=ax, color='#4daf4a', edgecolor='white')
 ax.axvline(india['average_delivery_time'].mean(), color='darkgreen', lw=1.5, linestyle='--',
@@ -153,7 +151,6 @@ ax.set_title('India — distribuce průměrné doby dovozu (minuty)'); ax.set_xl
 ax.legend(); plt.tight_layout(); plt.savefig(os.path.join(OUT, 'india_delivery_time.png'), bbox_inches='tight')
 print('[saved] india_delivery_time.png')
 
-# ── India top cities ──────────────────────────────────────────────────────────
 top_cities = india['location'].value_counts().head(15)
 fig, ax = plt.subplots(figsize=(12, 5))
 top_cities.sort_values().plot(kind='barh', ax=ax, color='#6aaa64', edgecolor='white')
@@ -163,7 +160,6 @@ for bar in ax.patches:
 plt.tight_layout(); plt.savefig(os.path.join(OUT, 'india_cities.png'), bbox_inches='tight')
 print(f'[saved] india_cities.png  | unique cities: {india["location"].nunique()}')
 
-# ── India cuisine types ───────────────────────────────────────────────────────
 cuisine_cols   = ['south_indian_or_not','north_indian_or_not','fast_food_or_not','street_food','biryani_or_not','bakery_or_not']
 cuisine_labels = ['South Indian','North Indian','Fast Food','Street Food','Biryani','Bakery']
 cuisine_counts = india[cuisine_cols].sum().values
@@ -176,7 +172,6 @@ ax.set_title('India — počet restaurací podle typu kuchyně'); ax.set_ylabel(
 plt.tight_layout(); plt.savefig(os.path.join(OUT, 'india_cuisine_types.png'), bbox_inches='tight')
 print('[saved] india_cuisine_types.png')
 
-# ── India rating vs price ─────────────────────────────────────────────────────
 sample = india.sample(3000, random_state=42)
 fig, ax = plt.subplots(figsize=(9, 6))
 ax.scatter(sample['average_price'], sample['rating'], alpha=0.25, s=12, color='#6aaa64')
@@ -189,7 +184,6 @@ ax.legend(); plt.tight_layout(); plt.savefig(os.path.join(OUT, 'india_rating_vs_
 corr = india['average_price'].corr(india['rating'])
 print(f'[saved] india_rating_vs_price.png  | Pearson corr: {corr:.4f}')
 
-# ── Dataset sizes ─────────────────────────────────────────────────────────────
 sizes = {'Dubai': len(dubai), 'USA': len(usa), 'India': len(india)}
 colors = ['#e07b54','#5b8db8','#6aaa64']
 fig, axes = plt.subplots(1, 2, figsize=(13, 5))
@@ -203,7 +197,6 @@ axes[1].set_title('Podíl datasetů')
 plt.tight_layout(); plt.savefig(os.path.join(OUT, 'dataset_sizes.png'), bbox_inches='tight')
 print('[saved] dataset_sizes.png')
 
-# ── Summary table ─────────────────────────────────────────────────────────────
 summary = pd.DataFrame({
     'Dataset':       ['Dubai','USA','India'],
     'Rows':          [len(dubai), len(usa), len(india)],
@@ -215,7 +208,6 @@ summary = pd.DataFrame({
 print('\n=== Summary ===')
 print(summary.to_string())
 
-# ── MongoDB cluster stats (optional) ─────────────────────────────────────────
 try:
     from pymongo import MongoClient
     client = MongoClient('mongodb://admin:RestCluster2024!@localhost:27017/?authSource=admin',
