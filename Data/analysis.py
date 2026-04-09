@@ -33,6 +33,21 @@ print(f'USA:    {len(usa):>6} rows  |  {usa.shape[1]} columns')
 print(f'India:  {len(india):>6} rows  |  {india.shape[1]} columns')
 print(f'Total:  {len(dubai)+len(usa)+len(india):>6} rows')
 
+print('\n=== Zdroje dat (URLs) ===')
+print('  Dubai:  https://www.kaggle.com/datasets/kanchana1990/dubai-restaurant-data-2024')
+print('  USA:    https://www.kaggle.com/datasets/datafiniti/fast-food-restaurants')
+print('  India:  https://www.kaggle.com/datasets/tharunprabu/indian-restaurants-data')
+
+print('\n=== Sumy (sum) ===')
+print(f'  Dubai  — suma polarity:           {dubai["polarity"].sum():.2f}')
+print(f'  USA    — počet poboček celkem:    {len(usa)}')
+print(f'  India  — suma hodnocení:          {india["rating"].sum():.2f}')
+print(f'  India  — suma průměrných cen:     {india["average_price"].sum():.2f} INR')
+print(f'  India  — south_indian celkem:     {india["south_indian_or_not"].sum():.0f}')
+print(f'  India  — north_indian celkem:     {india["north_indian_or_not"].sum():.0f}')
+print(f'  India  — fast_food celkem:        {india["fast_food_or_not"].sum():.0f}')
+print(f'  India  — biryani celkem:          {india["biryani_or_not"].sum():.0f}')
+
 def missing_report(df, name):
     total = len(df)
     miss  = df.isnull().sum()
@@ -222,12 +237,16 @@ try:
     for c,n in counts.items():
         print(f'  {c}: {n:,}')
 
+    chunk_cfg = cfg['settings'].find_one({'_id': 'chunksize'})
+    chunk_size_mb = chunk_cfg['value'] if chunk_cfg else 'default (128)'
+    print(f'\n=== Chunk size setting: {chunk_size_mb} MB ===')
+
     pipeline = [{'$group':{'_id':'$shard','chunks':{'$sum':1}}},{'$sort':{'_id':1}}]
     chunk_dist = list(cfg['chunks'].aggregate(pipeline))
     if chunk_dist:
         print('\n=== Chunk distribution ===')
         for d in chunk_dist:
-            print(f'  {d["_id"]}: {d["chunks"]} chunks')
+            print(f'  {d["_id"]}: {d["chunks"]} chunks  (~{d["chunks"] * int(chunk_size_mb if chunk_cfg else 128)} MB max)')
 
         fig, ax = plt.subplots(figsize=(8, 4))
         shards = [d['_id'] for d in chunk_dist]
