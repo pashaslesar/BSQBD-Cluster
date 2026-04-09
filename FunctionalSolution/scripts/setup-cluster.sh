@@ -1,9 +1,9 @@
 set -e
 
 ADMIN_USER="${MONGO_ADMIN_USER:-admin}"
-ADMIN_PASS="${MONGO_ADMIN_PASS:-admin12345}"
+ADMIN_PASS="${MONGO_ADMIN_PASS:-RestCluster2024!}"
 APP_USER="${MONGO_APP_USER:-appuser}"
-APP_PASS="${MONGO_APP_PASS:-user12345}"
+APP_PASS="${MONGO_APP_PASS:-AppPass2024!}"
 
 MAUTH="-u $ADMIN_USER -p $ADMIN_PASS --authenticationDatabase admin"
 
