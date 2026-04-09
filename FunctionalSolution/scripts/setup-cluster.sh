@@ -1,15 +1,12 @@
 set -e
 
-# ── Credentials (injected via docker-compose environment) ────────────────────
 ADMIN_USER="${MONGO_ADMIN_USER:-admin}"
-ADMIN_PASS="${MONGO_ADMIN_PASS:-RestCluster2024!}"
+ADMIN_PASS="${MONGO_ADMIN_PASS:-admin12345}"
 APP_USER="${MONGO_APP_USER:-appuser}"
-APP_PASS="${MONGO_APP_PASS:-AppPass2024!}"
+APP_PASS="${MONGO_APP_PASS:-user12345}"
 
-# Auth flags used after admin user is created (steps 3.5+)
 MAUTH="-u $ADMIN_USER -p $ADMIN_PASS --authenticationDatabase admin"
 
-# ── Helper functions ─────────────────────────────────────────────────────────
 
 wait_mongo() {
     local host=$1 port=$2
@@ -31,14 +28,6 @@ wait_primary() {
     done
     echo "[ok]   RS on $host:$port has a primary"
 }
-
-
-# ── RS init is handled by csrs-init / rs1-init / rs2-init / rs3-init ─────────
-# Those containers share the network namespace of their primary via
-# network_mode: "service:<primary>", so rs.initiate() runs from localhost
-# and the MongoDB keyFile localhost exception applies.
-# mongos depends_on all 4 init containers, so by the time this script runs
-# the replica sets are already initialized.  We just wait for primary elections.
 
 echo ""
 echo "══════════════════════════════════════════"
@@ -63,9 +52,6 @@ echo "════════════════════════�
 echo " STEP 3 – Create admin & app users"
 echo "══════════════════════════════════════════"
 
-# Use MongoDB localhost exception: before any admin users exist,
-# connections from localhost are allowed without credentials.
-# This script runs inside the mongos container → localhost:27017 works.
 
 if mongosh --host localhost --port 27017 --quiet $MAUTH \
     --eval "db.adminCommand({ping:1})" >/dev/null 2>&1; then

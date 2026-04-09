@@ -19,11 +19,6 @@ volumes:
 
 services:
 
-  # ─────────────────────────────────────────────
-  # Keyfile generator  (runs once, then exits)
-  # Generates a random 756-byte base64 keyfile for
-  # MongoDB internal cluster authentication (keyFile).
-  # ─────────────────────────────────────────────
   keyfile-init:
     image: mongo:8.0
     container_name: keyfile-init
@@ -44,9 +39,6 @@ services:
       - mongo-net
     restart: "no"
 
-  # ─────────────────────────────────────────────
-  # Config Server Replica Set  (csrs)
-  # ─────────────────────────────────────────────
   configsvr1:
     image: mongo:8.0
     container_name: configsvr1
@@ -122,9 +114,6 @@ services:
       retries: 20
       start_period: 60s
 
-  # ─────────────────────────────────────────────
-  # Shard 1 Replica Set  (rs1)
-  # ─────────────────────────────────────────────
   shard1-1:
     image: mongo:8.0
     container_name: shard1-1
@@ -200,9 +189,6 @@ services:
       retries: 20
       start_period: 60s
 
-  # ─────────────────────────────────────────────
-  # Shard 2 Replica Set  (rs2)
-  # ─────────────────────────────────────────────
   shard2-1:
     image: mongo:8.0
     container_name: shard2-1
@@ -278,9 +264,6 @@ services:
       retries: 20
       start_period: 60s
 
-  # ─────────────────────────────────────────────
-  # Shard 3 Replica Set  (rs3)
-  # ─────────────────────────────────────────────
   shard3-1:
     image: mongo:8.0
     container_name: shard3-1
@@ -356,16 +339,6 @@ services:
       retries: 20
       start_period: 60s
 
-  # ─────────────────────────────────────────────
-  # Replica Set Init Containers
-  #
-  # Problem: rs.initiate() requires the localhost exception (MongoDB keyFile),
-  # but setup-cluster.sh runs inside mongos — a different container from the
-  # shard/configsvr nodes.  To call rs.initiate() from "localhost" of each
-  # primary, these init containers share the network namespace of their primary
-  # via  network_mode: "service:<primary>".  That makes localhost:PORT resolve
-  # to the primary's own mongod, so the localhost exception applies.
-  # ─────────────────────────────────────────────
   csrs-init:
     image: mongo:8.0
     container_name: csrs-init
@@ -527,10 +500,6 @@ services:
         condition: service_healthy
     restart: "no"
 
-  # ─────────────────────────────────────────────
-  # mongos Router
-  # Starts only after all 4 RS init containers complete successfully.
-  # ─────────────────────────────────────────────
   mongos:
     image: mongo:8.0
     container_name: mongos
@@ -560,9 +529,6 @@ services:
         condition: service_completed_successfully
     restart: on-failure
 
-  # ─────────────────────────────────────────────
-  # MongoDB Compass Web UI
-  # ─────────────────────────────────────────────
   compass-web:
     image: haohanyang/compass-web:latest
     container_name: compass-web
