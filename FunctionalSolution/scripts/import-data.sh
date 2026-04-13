@@ -2,12 +2,10 @@ MONGOS_HOST="mongos"
 MONGOS_PORT="27017"
 DB="restaurants"
 DATA_DIR="/csv-data"
-TMP_DIR="/tmp/csv-clean"
 
 ADMIN_USER="${MONGO_ADMIN_USER:-admin}"
 ADMIN_PASS="${MONGO_ADMIN_PASS:-RestCluster2024!}"
 
-mkdir -p "$TMP_DIR"
 
 count_docs() {
     mongosh --host "$MONGOS_HOST" --port "$MONGOS_PORT" --quiet \
@@ -26,9 +24,7 @@ run_import() {
         --authenticationDatabase admin \
         --username "$ADMIN_USER" \
         --password "$ADMIN_PASS" \
-        --type csv \
-        --headerline \
-        --ignoreBlanks \
+        --type json \
         --numInsertionWorkers 4 \
         --file "$file"
     echo "[done]  $collection imported"
@@ -40,8 +36,7 @@ CNT=$(count_docs dubai_restaurants)
 if [ "$CNT" -gt 100 ]; then
     echo "[skip] already has $CNT documents"
 else
-    SRC="$DATA_DIR/dubai-restaurants.csv"
-    run_import dubai_restaurants "$SRC"
+    run_import dubai_restaurants "$DATA_DIR/dubai-restaurants.json"
 fi
 
 echo ""
@@ -50,8 +45,7 @@ CNT=$(count_docs usa_fastfood)
 if [ "$CNT" -gt 100 ]; then
     echo "[skip] already has $CNT documents"
 else
-    SRC="$DATA_DIR/fastfood-usa-restaurants.csv"
-    run_import usa_fastfood "$SRC"
+    run_import usa_fastfood "$DATA_DIR/fastfood-usa-restaurants.json"
 fi
 
 echo ""
@@ -60,12 +54,7 @@ CNT=$(count_docs indian_restaurants)
 if [ "$CNT" -gt 100 ]; then
     echo "[skip] already has $CNT documents"
 else
-    SRC_RAW="$DATA_DIR/indian-restaurants.csv"
-    SRC_CLEAN="$TMP_DIR/indian-restaurants.csv"
-    sed 's/\xef\xbb\xbf//' "$SRC_RAW" \
-        | sed '1s/average _delivery_time/average_delivery_time/' \
-        > "$SRC_CLEAN"
-    run_import indian_restaurants "$SRC_CLEAN"
+    run_import indian_restaurants "$DATA_DIR/indian-restaurants.json"
 fi
 
 echo ""
