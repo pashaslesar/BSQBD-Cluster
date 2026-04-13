@@ -81,7 +81,7 @@ db.indian_restaurants.aggregate([
 
 ### Dotaz 3 – Top 10 fastfood řetězců v USA s geografickým pokrytím
 
-**Zadání:** Zjisti 10 největších fastfood řetězců v USA – počet poboček, počet pokrytých států a průměrnou zeměpisnou délku (indikátor, zda je řetězec spíše západní, centrální nebo východní).
+**Zadání:** Zjisti 10 největších fastfood řetězců v USA – počet poboček, počet pokrytých států a klasifikaci pokrytí (místní / regionální / národní) podle počtu států.
 
 ```javascript
 db.usa_fastfood.aggregate([
@@ -89,36 +89,39 @@ db.usa_fastfood.aggregate([
       _id:           "$name",
       pocet_poboček: { $sum: 1 },
       staty:         { $addToSet: "$province" },
-      avg_longitude: { $avg: "$longitude" },
-      avg_latitude:  { $avg: "$latitude" }
+      mesta:         { $addToSet: "$city" }
   }},
   { $sort: { pocet_poboček: -1 } },
   { $limit: 10 },
   { $addFields: {
-      geograficka_oblast: {
+      pocet_statu: { $size: "$staty" },
+      pocet_mest:  { $size: "$mesta" }
+  }},
+  { $addFields: {
+      dosah: {
         $switch: {
           branches: [
-            { case: { $lt: ["$avg_longitude", -100] }, then: "Západ USA" },
-            { case: { $gt: ["$avg_longitude", -80]  }, then: "Východ USA" }
+            { case: { $gte: ["$pocet_statu", 40] }, then: "Národní řetězec" },
+            { case: { $gte: ["$pocet_statu", 15] }, then: "Regionální řetězec" }
           ],
-          default: "Střed USA"
+          default: "Místní řetězec"
         }
       }
   }},
   { $project: {
       _id: 0,
-      retezec:          "$_id",
-      pocet_poboček:    1,
-      pocet_statu:      { $size: "$staty" },
-      avg_longitude:    { $round: ["$avg_longitude", 2] },
-      geograficka_oblast: 1
+      retezec:       "$_id",
+      pocet_poboček: 1,
+      pocet_statu:   1,
+      pocet_mest:    1,
+      dosah:         1
   }}
 ])
 ```
 
-**Jak dotaz pracuje:** Po seskupení podle názvu řetězce pipeline přidá nové pole `geograficka_oblast` pomocí `$addFields` a `$switch`, které klasifikuje průměrnou zeměpisnou polohu. `$addToSet` sbírá unikátní státy. Využívá index `{ name: 1, province: 1 }`.
+**Jak dotaz pracuje:** Po seskupení podle názvu řetězce `$addToSet` sbírá unikátní státy i města. Druhý `$addFields` vypočítá jejich počet pomocí `$size`. Třetí fáze `$addFields` + `$switch` klasifikuje řetězec podle počtu pokrytých států: 40+ = národní, 15–39 = regionální, méně = místní. Využívá index `{ name: 1, province: 1 }`.
 
-**Interpretace výsledku:** McDonald's a Subway dominují celkovým počtem poboček. Řetězce klasifikované jako „Střed USA" mají rovnoměrnější distribuci poboček přes celé USA, zatímco „Východ USA" odpovídá hustěji obydleným oblastem.
+**Interpretace výsledku:** McDonald's a Burger King dominují počtem poboček i státním pokrytím. Klasifikace `dosah` odlišuje skutečně národní řetězce (přítomné ve 40+ státech) od regionálních. Počet měst ukazuje, jak hluboko řetězec proniká do lokálních trhů.
 
 ---
 
