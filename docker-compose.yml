@@ -60,7 +60,7 @@ services:
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27019", "--quiet", "--eval", "db.adminCommand({ping:1})"]
       interval: 15s
-      timeout: 15s
+      timeout: 30s
       retries: 20
       start_period: 60s
 
@@ -85,7 +85,7 @@ services:
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27019", "--quiet", "--eval", "db.adminCommand({ping:1})"]
       interval: 15s
-      timeout: 15s
+      timeout: 30s
       retries: 20
       start_period: 60s
 
@@ -110,7 +110,7 @@ services:
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27019", "--quiet", "--eval", "db.adminCommand({ping:1})"]
       interval: 15s
-      timeout: 15s
+      timeout: 30s
       retries: 20
       start_period: 60s
 
@@ -135,7 +135,7 @@ services:
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
       interval: 15s
-      timeout: 15s
+      timeout: 30s
       retries: 20
       start_period: 60s
 
@@ -160,7 +160,7 @@ services:
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
       interval: 15s
-      timeout: 15s
+      timeout: 30s
       retries: 20
       start_period: 60s
 
@@ -185,7 +185,7 @@ services:
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
       interval: 15s
-      timeout: 15s
+      timeout: 30s
       retries: 20
       start_period: 60s
 
@@ -210,7 +210,7 @@ services:
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
       interval: 15s
-      timeout: 15s
+      timeout: 30s
       retries: 20
       start_period: 60s
 
@@ -235,7 +235,7 @@ services:
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
       interval: 15s
-      timeout: 15s
+      timeout: 30s
       retries: 20
       start_period: 60s
 
@@ -260,7 +260,7 @@ services:
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
       interval: 15s
-      timeout: 15s
+      timeout: 30s
       retries: 20
       start_period: 60s
 
@@ -285,7 +285,7 @@ services:
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
       interval: 15s
-      timeout: 15s
+      timeout: 30s
       retries: 20
       start_period: 60s
 
@@ -310,7 +310,7 @@ services:
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
       interval: 15s
-      timeout: 15s
+      timeout: 30s
       retries: 20
       start_period: 60s
 
@@ -335,7 +335,7 @@ services:
     healthcheck:
       test: ["CMD", "mongosh", "--port", "27018", "--quiet", "--eval", "db.adminCommand({ping:1})"]
       interval: 15s
-      timeout: 15s
+      timeout: 30s
       retries: 20
       start_period: 60s
 
