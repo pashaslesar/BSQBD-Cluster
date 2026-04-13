@@ -10,37 +10,38 @@ Cluster: MongoDB 8.x Sharded Cluster (3 shardy, každý jako replica set 1×prim
 
 ---
 
-### Dotaz 1 – Top 10 kategorií v Dubaji podle počtu restaurací s geografickým centroidem
+### Dotaz 1 – Top 10 typů podniků v Dubaji podle počtu s geografickým centroidem
 
-**Zadání:** Zjisti 10 nejpočetnějších kategorií restaurací v Dubaji. Pro každou kategorii spočítej počet restaurací, zeměpisný centroid (průměrná poloha) a počet unikátních podkategorií.
+**Zadání:** Zjisti 10 nejpočetnějších typů podniků (subCategory) v Dubaji. Pro každý typ spočítej počet restaurací, zeměpisný centroid (průměrná poloha) a ukázkové jméno nejdelší recenze.
 
 ```javascript
 use restaurants
 
 db.dubai_restaurants.aggregate([
+  { $match: { subCategory: { $ne: null } } },
   { $group: {
-      _id:           "$category",
-      count:         { $sum: 1 },
-      avg_lat:       { $avg: "$lat" },
-      avg_lng:       { $avg: "$lng" },
-      subcategories: { $addToSet: "$subCategory" }
+      _id:     "$subCategory",
+      count:   { $sum: 1 },
+      avg_lat: { $avg: "$lat" },
+      avg_lng: { $avg: "$lng" },
+      locations: { $addToSet: "$location" }
   }},
   { $project: {
       _id: 0,
-      category:          "$_id",
-      count:             1,
-      centroid_lat:      { $round: ["$avg_lat", 4] },
-      centroid_lng:      { $round: ["$avg_lng", 4] },
-      num_subcategories: { $size: "$subcategories" }
+      subCategory:    "$_id",
+      count:          1,
+      centroid_lat:   { $round: ["$avg_lat", 4] },
+      centroid_lng:   { $round: ["$avg_lng", 4] },
+      num_locations:  { $size: "$locations" }
   }},
   { $sort: { count: -1 } },
   { $limit: 10 }
 ])
 ```
 
-**Jak dotaz pracuje:** Pipeline seskupí dokumenty podle `category`. Pro každou kategorii spočítá počet restaurací (`$sum`), průměrnou zeměpisnou polohu (`$avg` na `lat`/`lng`) a unikátní podkategorie pomocí `$addToSet`. Ve fázi `$project` se zeměpisné souřadnice zaokrouhlí na 4 desetinná místa a pole podkategorií se převede na počet pomocí `$size`. Výsledek je seřazen sestupně a oříznut na 10.
+**Jak dotaz pracuje:** `$match` odstraní záznamy bez subCategory (2 988 záznamů formátu B). Pipeline seskupí zbývající dokumenty podle `subCategory`. Pro každý typ spočítá počet (`$sum`), průměrnou zeměpisnou polohu (`$avg` na `lat`/`lng`) a unikátní lokace pomocí `$addToSet`. Ve fázi `$project` se souřadnice zaokrouhlí a pole lokací převede na počet pomocí `$size`. Výsledek je seřazen sestupně a oříznut na 10.
 
-**Interpretace výsledku:** Výsledek ukazuje dominantní typy stravování v Dubaji podle počtu provozoven. Centroid odhaluje geografické centrum každé kategorie — např. fast food řetězce jsou koncentrovány jinak než luxusní restaurace. Počet podkategorií naznačuje diverzitu nabídky v rámci kategorie.
+**Interpretace výsledku:** Výsledek ukazuje dominantní typy podniků v Dubaji — coffee shopy, hotely, bary. Centroid ukazuje, kde jsou geograficky soustředěny. Počet lokací odhaluje, jak územně rozptýlený je každý typ podniku.
 
 ---
 
