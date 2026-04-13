@@ -10,38 +10,37 @@ Cluster: MongoDB 8.x Sharded Cluster (3 shardy, každý jako replica set 1×prim
 
 ---
 
-### Dotaz 1 – Top 10 kategorií v Dubaji podle průměrného sentimentu
+### Dotaz 1 – Top 10 kategorií v Dubaji podle počtu restaurací s geografickým centroidem
 
-**Zadání:** Zjisti, které kategorie restaurací v Dubaji mají nejvyšší průměrnou polaritu (sentiment), kolik restaurací každá kategorie obsahuje a jaké jsou její extrémní hodnoty polarity.
+**Zadání:** Zjisti 10 nejpočetnějších kategorií restaurací v Dubaji. Pro každou kategorii spočítej počet restaurací, zeměpisný centroid (průměrná poloha) a počet unikátních podkategorií.
 
 ```javascript
 use restaurants
 
 db.dubai_restaurants.aggregate([
-  { $match: { polarity: { $ne: 0 } } },
   { $group: {
-      _id: "$category",
-      avg_polarity:  { $avg: "$polarity" },
+      _id:           "$category",
       count:         { $sum: 1 },
-      max_polarity:  { $max: "$polarity" },
-      min_polarity:  { $min: "$polarity" }
+      avg_lat:       { $avg: "$lat" },
+      avg_lng:       { $avg: "$lng" },
+      subcategories: { $addToSet: "$subCategory" }
   }},
-  { $sort: { avg_polarity: -1 } },
-  { $limit: 10 },
   { $project: {
       _id: 0,
-      category:     "$_id",
-      avg_polarity: { $round: ["$avg_polarity", 3] },
-      count:        1,
-      max_polarity: 1,
-      min_polarity: 1
-  }}
+      category:          "$_id",
+      count:             1,
+      centroid_lat:      { $round: ["$avg_lat", 4] },
+      centroid_lng:      { $round: ["$avg_lng", 4] },
+      num_subcategories: { $size: "$subcategories" }
+  }},
+  { $sort: { count: -1 } },
+  { $limit: 10 }
 ])
 ```
 
-**Jak dotaz pracuje:** Pipeline nejprve odstraní záznamy s nulovou polaritou (neutrální), poté seskupí dokumenty podle pole `category` a spočítá průměr, počet a extrémy polarity. Výsledek je seřazen sestupně a oříznut na 10 řádků. Využívá index `{ category: 1, polarity: -1 }`.
+**Jak dotaz pracuje:** Pipeline seskupí dokumenty podle `category`. Pro každou kategorii spočítá počet restaurací (`$sum`), průměrnou zeměpisnou polohu (`$avg` na `lat`/`lng`) a unikátní podkategorie pomocí `$addToSet`. Ve fázi `$project` se zeměpisné souřadnice zaokrouhlí na 4 desetinná místa a pole podkategorií se převede na počet pomocí `$size`. Výsledek je seřazen sestupně a oříznut na 10.
 
-**Interpretace výsledku:** Výsledek ukazuje, které typy gastro podniků v Dubaji mají nejlepší vnímání zákazníků. Kategorie s vysokou průměrnou polaritou a velkým počtem záznamů jsou statisticky spolehlivé – dávají smysl jako cíl pro marketingová doporučení.
+**Interpretace výsledku:** Výsledek ukazuje dominantní typy stravování v Dubaji podle počtu provozoven. Centroid odhaluje geografické centrum každé kategorie — např. fast food řetězce jsou koncentrovány jinak než luxusní restaurace. Počet podkategorií naznačuje diverzitu nabídky v rámci kategorie.
 
 ---
 
@@ -167,45 +166,49 @@ db.indian_restaurants.aggregate([
 
 ---
 
-### Dotaz 5 – Restaurace v Dubaji s nadprůměrnou polaritou ve své kategorii (self-join $lookup)
+### Dotaz 5 – Restaurace v Dubaji s nadprůměrně dlouhou recenzí ve své kategorii (self-join $lookup)
 
-**Zadání:** Pro každou kategorii v Dubaji najdi top 3 restaurace, které mají polaritu nad průměrem své kategorie. Výsledek ukaž jako vnořené dokumenty.
+**Zadání:** Pro každou kategorii v Dubaji najdi top 3 restaurace, jejichž recenze jsou delší než průměr kategorie. Délka textu pole `reviews` slouží jako proxy ukazatel popularity a zapojení zákazníků.
 
 ```javascript
 db.dubai_restaurants.aggregate([
+  { $addFields: { review_len: { $strLenCP: { $ifNull: ["$reviews", ""] } } } },
   { $group: {
-      _id:          "$category",
-      avg_polarity: { $avg: "$polarity" }
+      _id:         "$category",
+      avg_rev_len: { $avg: "$review_len" },
+      count:       { $sum: 1 }
   }},
   { $lookup: {
       from: "dubai_restaurants",
-      let:  { kat: "$_id", avg_pol: "$avg_polarity" },
+      let:  { kat: "$_id", avg_len: "$avg_rev_len" },
       pipeline: [
+        { $addFields: { review_len: { $strLenCP: { $ifNull: ["$reviews", ""] } } } },
         { $match: { $expr: { $and: [
-            { $eq:  ["$category", "$$kat"]     },
-            { $gt:  ["$polarity", "$$avg_pol"] }
+            { $eq: ["$category",  "$$kat"]     },
+            { $gt: ["$review_len", "$$avg_len"] }
         ]}}},
-        { $sort:    { polarity: -1 } },
+        { $sort:    { review_len: -1 } },
         { $limit:   3 },
-        { $project: { name: 1, polarity: 1, subCategory: 1, _id: 0 } }
+        { $project: { name: 1, review_len: 1, subCategory: 1, location: 1, _id: 0 } }
       ],
       as: "top_restaurace"
   }},
   { $match: { "top_restaurace.0": { $exists: true } } },
-  { $sort:  { avg_polarity: -1 } },
+  { $sort:  { avg_rev_len: -1 } },
   { $limit: 8 },
   { $project: {
       _id: 0,
-      kategorie:    "$_id",
-      avg_polarity: { $round: ["$avg_polarity", 3] },
+      kategorie:      "$_id",
+      count:          1,
+      avg_rev_len:    { $round: ["$avg_rev_len", 0] },
       top_restaurace: 1
   }}
 ])
 ```
 
-**Jak dotaz pracuje:** Nejprve `$group` vypočítá průměrnou polaritu každé kategorie. Poté `$lookup` provede korelovaný poddotaz (self-join) zpět na kolekci `dubai_restaurants` – pro každou kategorii vrátí jen restaurace s polaritou vyšší než průměr, seřazené sestupně. Jde o pokročilý vzor korelovaného $lookup s `let` proměnnými.
+**Jak dotaz pracuje:** Nejprve `$addFields` s `$strLenCP` přidá délku textu recenze ke každému dokumentu. `$group` vypočítá průměrnou délku recenze pro každou kategorii. Korelovaný `$lookup` (self-join) provede poddotaz pro každou kategorii – vrátí jen restaurace s delší recenzí než průměr kategorie. Jde o pokročilý vzor `$lookup` s `let` proměnnými a pipeline v poddotazu.
 
-**Interpretace výsledku:** Výsledek odhaluje konkrétní restaurace, které táhnou průměr kategorie nahoru. Jsou to kandidáti na „doporučené restaurace" v každé gastronomické kategorii Dubaje.
+**Interpretace výsledku:** Restaurace s delšími recenzemi typicky přitahují zákazníky, kteří sdílejí podrobné zkušenosti – indikátor popularity a výraznosti provozovny. Výsledek ukazuje konkrétní restaurace, které jsou v rámci své kategorie komunikačně nejaktivnější.
 
 ---
 
@@ -839,13 +842,13 @@ db.indian_restaurants.aggregate([
 
 ### Dotaz 18 – Reshape Dubai dokumentů pro report: geo_point + data_quality objekt + $unset
 
-**Zadání:** Pro pozitivně hodnocené Dubai restaurace se subkategorií přetvoř strukturu dokumentu: vytvoř GeoJSON bod, objekt kvality dat a odstraň nepotřebná pole.
+**Zadání:** Pro Dubai restaurace, které mají vyplněnou subkategorii i adresu, přetvoř strukturu dokumentu: vytvoř GeoJSON bod, objekt kvality dat a odstraň nepotřebná pole.
 
 ```javascript
 db.dubai_restaurants.aggregate([
   { $match: {
-      polarity:    { $gt: 0.3 },
-      subCategory: { $ne: null }
+      subCategory: { $ne: null },
+      address:     { $ne: null }
   }},
   { $addFields: {
       geo_point: {
@@ -872,14 +875,14 @@ db.dubai_restaurants.aggregate([
       zdroj_hodnoceni: 1,
       kvalita_dat:     1
   }},
-  { $sort:  { polarity: -1 } },
+  { $sort:  { name: 1 } },
   { $limit: 15 }
 ])
 ```
 
-**Jak dotaz pracuje:** `$addFields` vytvoří vnořený GeoJSON objekt a `kvalita_dat` dokument s boolean hodnotami. `$unset` odstraní redundantní pole. `$project` přesně určí finální výstupní strukturu. Výsledek je čistý dokument připravený pro export nebo API odpověď.
+**Jak dotaz pracuje:** `$match` vybere dokumenty s vyplněnou subkategorií i adresou. `$addFields` vytvoří vnořený GeoJSON objekt a `kvalita_dat` dokument s boolean hodnotami. `$unset` odstraní redundantní pole. `$project` přesně určí finální výstupní strukturu. Výsledek je čistý dokument připravený pro export nebo API odpověď.
 
-**Interpretace výsledku:** Výsledné dokumenty mají standardizovanou strukturu vhodnou pro import do geospatial systémů (GeoJSON). Objekt `kvalita_dat` umožní následnou filtraci kompletních vs. neúplných záznamů.
+**Interpretace výsledku:** Výsledné dokumenty mají standardizovanou strukturu vhodnou pro import do geospatial systémů (GeoJSON). Objekt `kvalita_dat` umožní následnou filtraci kompletních vs. neúplných záznamů — `ma_adresu` a `ma_subkategorii` budou `true` u všech výsledků (podmínka filtru), `ma_polarity` bude `false` u většiny (zrcadlí reálný stav dat).
 
 ---
 
