@@ -1,3 +1,41 @@
-docker inspect shard3-1 --format '{{json .State.Health}}' | python3 -m json.tool 2>/dev/null || docker inspect shard3-1 --format '{{json .State.Health}}'
+tudent@fei-bsqbd-26-064:~/Desktop/sp-bsqbd$ docker inspect shard3-1 --format '{{json .State.Health}}' | python3 -m json.tool 2>/dev/null || docker inspect shard3-1 --format '{{json .State.Health}}'
+{
+    "Status": "healthy",
+    "FailingStreak": 4,
+    "Log": [
+        {
+            "Start": "2026-04-13T15:13:32.551441829+02:00",
+            "End": "2026-04-13T15:13:47.269814867+02:00",
+            "ExitCode": 0,
+            "Output": "{ ok: 1 }\n"
+        },
+        {
+            "Start": "2026-04-13T15:14:02.273333549+02:00",
+            "End": "2026-04-13T15:14:17.867923298+02:00",
+            "ExitCode": -1,
+            "Output": "Health check exceeded timeout (15s)"
+        },
+        {
+            "Start": "2026-04-13T15:14:32.874954592+02:00",
+            "End": "2026-04-13T15:14:48.366555276+02:00",
+            "ExitCode": -1,
+            "Output": "Health check exceeded timeout (15s)"
+        },
+        {
+            "Start": "2026-04-13T15:15:03.452425509+02:00",
+            "End": "2026-04-13T15:15:18.874881073+02:00",
+            "ExitCode": -1,
+            "Output": "Health check exceeded timeout (15s)"
+        },
+        {
+            "Start": "2026-04-13T15:15:33.879641061+02:00",
+            "End": "2026-04-13T15:15:50.51692157+02:00",
+            "ExitCode": -1,
+            "Output": "Health check exceeded timeout (15s)"
+        }
+    ]
+}
+student@fei-bsqbd-26-064:~/Desktop/sp-bsqbd$ docker exec shard3-1 mongosh --port 27018 --quiet --eval "db.adminCommand({ping:1})"
+{ ok: 1 }
+student@fei-bsqbd-26-064:~/Desktop/sp-bsqbd$ 
 
-docker exec shard3-1 mongosh --port 27018 --quiet --eval "db.adminCommand({ping:1})"
