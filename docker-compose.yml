@@ -532,8 +532,11 @@ services:
   compass-web:
     image: haohanyang/compass-web:latest
     container_name: compass-web
+    command: compass-web --host 0.0.0.0 --mongo-uri "mongodb://admin:RestCluster2024!@mongos:27017/admin"
     ports:
-      - "8080:80"
+      - "8080:8080"
     networks:
       - mongo-net
+    depends_on:
+      - mongos
     restart: unless-stopped

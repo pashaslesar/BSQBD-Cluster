@@ -24,7 +24,7 @@ db.dubai_restaurants.aggregate([
       count:   { $sum: 1 },
       avg_lat: { $avg: "$lat" },
       avg_lng: { $avg: "$lng" },
-      locations: { $addToSet: "$location" }
+      locations: { $addToSet: "$address" }
   }},
   { $project: {
       _id: 0,
@@ -176,36 +176,39 @@ db.indian_restaurants.aggregate([
 
 ```javascript
 db.dubai_restaurants.aggregate([
-  { $addFields: { review_len: { $strLenCP: { $ifNull: ["$reviews", ""] } } } },
+  { $match: { subCategory: { $ne: null } } },
   { $group: {
-      _id:         "$category",
-      avg_rev_len: { $avg: "$review_len" },
-      count:       { $sum: 1 }
+      _id:     "$subCategory",
+      avg_lat: { $avg: "$lat" },
+      avg_lng: { $avg: "$lng" },
+      count:   { $sum: 1 }
   }},
   { $lookup: {
       from: "dubai_restaurants",
-      let:  { kat: "$_id", avg_len: "$avg_rev_len" },
+      let:  { kat: "$_id", clat: "$avg_lat", clng: "$avg_lng" },
       pipeline: [
-        { $addFields: { review_len: { $strLenCP: { $ifNull: ["$reviews", ""] } } } },
-        { $match: { $expr: { $and: [
-            { $eq: ["$category",  "$$kat"]     },
-            { $gt: ["$review_len", "$$avg_len"] }
-        ]}}},
-        { $sort:    { review_len: -1 } },
+        { $match: { $expr: { $eq: ["$subCategory", "$$kat"] } } },
+        { $addFields: {
+            dist: { $sqrt: { $add: [
+              { $pow: [{ $subtract: ["$lat", "$$clat"] }, 2] },
+              { $pow: [{ $subtract: ["$lng", "$$clng"] }, 2] }
+            ]}}
+        }},
+        { $sort:    { dist: -1 } },
         { $limit:   3 },
-        { $project: { name: 1, review_len: 1, subCategory: 1, location: 1, _id: 0 } }
+        { $project: { name: 1, subCategory: 1, address: 1, dist: { $round: ["$dist", 5] }, _id: 0 } }
       ],
-      as: "top_restaurace"
+      as: "outliers"
   }},
-  { $match: { "top_restaurace.0": { $exists: true } } },
-  { $sort:  { avg_rev_len: -1 } },
-  { $limit: 8 },
+  { $sort:  { count: -1 } },
+  { $limit: 6 },
   { $project: {
       _id: 0,
-      kategorie:      "$_id",
-      count:          1,
-      avg_rev_len:    { $round: ["$avg_rev_len", 0] },
-      top_restaurace: 1
+      subKategorie: "$_id",
+      count:        1,
+      centroid_lat: { $round: ["$avg_lat", 4] },
+      centroid_lng: { $round: ["$avg_lng", 4] },
+      outliers:     1
   }}
 ])
 ```
@@ -223,29 +226,30 @@ db.dubai_restaurants.aggregate([
 ```javascript
 db.dubai_restaurants.aggregate([
   { $facet: {
-      "dle_kategorie": [
-        { $group: { _id: "$category", pocet: { $sum: 1 }, avg_polarity: { $avg: "$polarity" } } },
+      "dle_subkategorie": [
+        { $match: { subCategory: { $ne: null } } },
+        { $group: { _id: "$subCategory", pocet: { $sum: 1 } } },
         { $sort:  { pocet: -1 } },
         { $limit: 5 }
       ],
-      "dle_lokace": [
-        { $group: { _id: "$location", pocet: { $sum: 1 } } },
+      "dle_adresy": [
+        { $match: { address: { $ne: null } } },
+        { $group: { _id: "$address", pocet: { $sum: 1 } } },
         { $sort:  { pocet: -1 } },
         { $limit: 5 }
       ],
-      "statistika_polarity": [
+      "kvalita_dat": [
         { $group: {
-            _id:       null,
-            celkem:    { $sum: 1 },
-            prumer:    { $avg: "$polarity" },
-            maximum:   { $max: "$polarity" },
-            minimum:   { $min: "$polarity" },
-            pozitivni: { $sum: { $cond: [{ $gt:  ["$polarity", 0] }, 1, 0] } },
-            negativni: { $sum: { $cond: [{ $lt:  ["$polarity", 0] }, 1, 0] } },
-            neutralni: { $sum: { $cond: [{ $eq:  ["$polarity", 0] }, 1, 0] } }
+            _id:             null,
+            celkem:          { $sum: 1 },
+            se_subkat:       { $sum: { $cond: [{ $ne: ["$subCategory", null] }, 1, 0] } },
+            se_adresou:      { $sum: { $cond: [{ $ne: ["$address", null] }, 1, 0] } },
+            se_souradnicemi: { $sum: { $cond: [{ $and: [{ $ne: ["$lat", null] }, { $ne: ["$lng", null] }] }, 1, 0] } },
+            avg_lat:         { $avg: "$lat" },
+            avg_lng:         { $avg: "$lng" }
         }},
-        { $project: { _id: 0, celkem: 1, prumer: { $round: ["$prumer", 4] },
-            maximum: 1, minimum: 1, pozitivni: 1, negativni: 1, neutralni: 1 } }
+        { $project: { _id: 0, celkem: 1, se_subkat: 1, se_adresou: 1, se_souradnicemi: 1,
+            centroid: { lat: { $round: ["$avg_lat", 4] }, lng: { $round: ["$avg_lng", 4] } } } }
       ]
   }}
 ])
@@ -285,14 +289,16 @@ db.usa_fastfood.aggregate([
   { $match: { "dubai_pobocky.0": { $exists: true } } },
   { $project: {
       _id: 0,
-      retezec:         "$_id",
-      usa_poboček:     "$usa_count",
-      usa_statu:       { $size: "$usa_staty" },
-      dubai_poboček:   { $size: "$dubai_pobocky" },
-      dubai_sentiment: { $avg: "$dubai_pobocky.polarity" },
-      dubai_detail:    "$dubai_pobocky"
+      retezec:          "$_id",
+      usa_poboček:      "$usa_count",
+      usa_statu:        { $size: "$usa_staty" },
+      dubai_poboček:    { $size: "$dubai_pobocky" },
+      dubai_subkategorie: {
+        $slice: [{ $setUnion: ["$dubai_pobocky.subCategory", []] }, 5]
+      }
   }},
-  { $sort: { usa_poboček: -1 } }
+  { $sort: { usa_poboček: -1 } },
+  { $limit: 10 }
 ])
 ```
 
@@ -358,10 +364,8 @@ db.dubai_restaurants.aggregate([
       ]
   }},
   { $group: {
-      _id:          { $ifNull: ["$subCategory", "Nezařazeno"] },
-      dubai_count:  { $sum: 1 },
-      avg_polarity: { $avg: "$polarity" },
-      lokace:       { $addToSet: "$location" }
+      _id:         { $ifNull: ["$subCategory", "Nezařazeno"] },
+      dubai_count: { $sum: 1 }
   }},
   { $lookup: {
       from: "indian_restaurants",
@@ -380,8 +384,7 @@ db.dubai_restaurants.aggregate([
   { $project: {
       _id: 0,
       dubai_subkategorie: "$_id",
-      dubai_count:        1,
-      avg_polarity:       { $round: ["$avg_polarity", 3] },
+      dubai_count:  1,
       india_kontext: {
         celkem_fastfood:  "$india_fastfood.india_ff_count",
         avg_hodnoceni:    { $round: ["$india_fastfood.india_avg_rate", 2] },
@@ -394,7 +397,7 @@ db.dubai_restaurants.aggregate([
 
 **Jak dotaz pracuje:** Pipeline filtruje Dubai záznamy odpovídající fastfood charakteristice, seskupí podle subkategorie a přidá souhrnný `$lookup` bez podmínky `let` – vrátí jednu globální statistiku z Indie, která se `$unwind` rozbalí a připojí ke každému Dubai řádku jako kontext.
 
-**Interpretace výsledku:** Každá Dubai fastfood subkategorie je doplněna absolutními čísly z indického fastfood segmentu. Ukazuje rozdíl v sentiment profilu (polarity v Dubaji) oproti hodnocení v Indii.
+**Interpretace výsledku:** Každá Dubai fastfood subkategorie je doplněna absolutními čísly z indického fastfood segmentu. Ukazuje, jak jsou jednotlivé typy fastfood zastoupeny v Dubaji a jak je indický fastfood segment hodnocen zákazníky.
 
 ---
 
@@ -404,9 +407,9 @@ db.dubai_restaurants.aggregate([
 
 ```javascript
 db.usa_fastfood.aggregate([
-  { $match: { name: { $in: ["McDonald's", "Subway", "KFC", "Pizza Hut", "Burger King", "Domino's"] } } },
+  { $match: { name: { $regex: /^(McDonald's|Subway|KFC|Pizza Hut|Burger King|Domino's Pizza)$/i } } },
   { $group: {
-      _id:       "$name",
+      _id:       { $toLower: "$name" },
       usa_count: { $sum: 1 },
       usa_staty: { $addToSet: "$province" }
   }},
@@ -415,9 +418,9 @@ db.usa_fastfood.aggregate([
       let:  { cname: "$_id" },
       pipeline: [
         { $match: { $expr: { $regexMatch: { input: "$name", regex: "$$cname", options: "i" } } } },
-        { $group: { _id: null, count: { $sum: 1 }, avg_pol: { $avg: "$polarity" } } }
+        { $group: { _id: null, count: { $sum: 1 } } }
       ],
-      as: "dubai"
+      as: "dubai_raw"
   }},
   { $lookup: {
       from: "indian_restaurants",
@@ -426,7 +429,7 @@ db.usa_fastfood.aggregate([
         { $match: { $expr: { $regexMatch: { input: "$restaurant_name", regex: "$$cname", options: "i" } } } },
         { $group: { _id: null, count: { $sum: 1 }, avg_rating: { $avg: "$rating" }, avg_price: { $avg: "$average_price" } } }
       ],
-      as: "india"
+      as: "india_raw"
   }},
   { $project: {
       _id: 0,
@@ -436,19 +439,18 @@ db.usa_fastfood.aggregate([
         statu:   { $size: "$usa_staty" }
       },
       dubai: {
-        poboček:    { $ifNull: [{ $arrayElemAt: ["$dubai.count",   0] }, 0] },
-        avg_sentiment: { $round: [{ $ifNull: [{ $arrayElemAt: ["$dubai.avg_pol", 0] }, 0] }, 3] }
+        poboček: { $ifNull: [{ $arrayElemAt: ["$dubai_raw.count", 0] }, 0] }
       },
       india: {
-        poboček:    { $ifNull: [{ $arrayElemAt: ["$india.count",      0] }, 0] },
-        avg_rating: { $round: [{ $ifNull: [{ $arrayElemAt: ["$india.avg_rating", 0] }, 0] }, 2] },
-        avg_cena_inr: { $round: [{ $ifNull: [{ $arrayElemAt: ["$india.avg_price", 0] }, 0] }, 0] }
+        poboček:      { $ifNull: [{ $arrayElemAt: ["$india_raw.count",      0] }, 0] },
+        avg_rating:   { $round: [{ $ifNull: [{ $arrayElemAt: ["$india_raw.avg_rating", 0] }, 0] }, 2] },
+        avg_cena_inr: { $round: [{ $ifNull: [{ $arrayElemAt: ["$india_raw.avg_price",  0] }, 0] }, 0] }
       },
       globalni_datasety: {
         $sum: [
           { $cond: [{ $gt: ["$usa_count", 0] }, 1, 0] },
-          { $cond: [{ $gt: [{ $size: "$dubai" }, 0] }, 1, 0] },
-          { $cond: [{ $gt: [{ $size: "$india" }, 0] }, 1, 0] }
+          { $cond: [{ $gt: [{ $size: "$dubai_raw" }, 0] }, 1, 0] },
+          { $cond: [{ $gt: [{ $size: "$india_raw" }, 0] }, 1, 0] }
         ]
       }
   }},
@@ -487,9 +489,8 @@ db.indian_restaurants.aggregate([
             { category:    { $regex: /indian/i } }
         ]}},
         { $group: {
-            _id:           null,
-            dubai_indian:  { $sum: 1 },
-            avg_polarity:  { $avg: "$polarity" }
+            _id:          null,
+            dubai_indian: { $sum: 1 }
         }}
       ],
       as: "dubai_indian_kontext"
@@ -503,8 +504,7 @@ db.indian_restaurants.aggregate([
       avg_cena_inr:       { $round: ["$avg_price", 0] },
       avg_doruceni_min:   { $round: ["$avg_delivery", 0] },
       dubai_kontext: {
-        indickych_v_dubaji: { $ifNull: ["$dubai_indian_kontext.dubai_indian", 0] },
-        avg_sentiment:      { $round: [{ $ifNull: ["$dubai_indian_kontext.avg_polarity", 0] }, 3] }
+        indickych_v_dubaji: { $ifNull: ["$dubai_indian_kontext.dubai_indian", 0] }
       }
   }}
 ])
@@ -518,7 +518,7 @@ db.indian_restaurants.aggregate([
 
 ### Dotaz 12 – Geografická zonální analýza: hustota Dubai vs. USA restaurací ($group + $lookup přes souřadnice)
 
-**Zadání:** Seskup Dubai restaurace do geografických zón (zaokrouhlení souřadnic) a zjisti, zda v téže zeměpisné zóně existují i USA fastfood záznamy.
+**Zadání:** Seskup Dubai restaurace do geografických zón (zaokrouhlení souřadnic na stupně) a zjisti, kolik USA fastfood restaurací leží na stejném zeměpisném pásu (stejná šířka) – tedy na stejné rovnoběžce na planetě.
 
 ```javascript
 db.dubai_restaurants.aggregate([
@@ -529,38 +529,33 @@ db.dubai_restaurants.aggregate([
         lng_bin: { $floor: "$lng" }
       },
       dubai_count:  { $sum: 1 },
-      avg_polarity: { $avg: "$polarity" },
-      kategorie:    { $addToSet: "$category" }
+      subkategorie: { $addToSet: "$subCategory" }
   }},
   { $lookup: {
       from: "usa_fastfood",
-      let:  { lat_b: "$_id.lat_bin", lng_b: "$_id.lng_bin" },
+      let:  { lat_b: "$_id.lat_bin" },
       pipeline: [
-        { $match: { $expr: { $and: [
-            { $eq: [{ $floor: "$latitude"  }, "$$lat_b"] },
-            { $eq: [{ $floor: "$longitude" }, "$$lng_b"] }
-        ]}}},
-        { $count: "usa_v_zone" }
+        { $match: { $expr: { $eq: [{ $floor: "$latitude" }, "$$lat_b"] } } },
+        { $count: "usa_v_pasmu" }
       ],
-      as: "usa_zona"
+      as: "usa_pasmo"
   }},
   { $project: {
       _id: 0,
-      lat_zona:           "$_id.lat_bin",
-      lng_zona:           "$_id.lng_bin",
-      dubai_count:        1,
-      avg_polarity:       { $round: ["$avg_polarity", 3] },
-      pestrost_kategorii: { $size: "$kategorie" },
-      usa_restauraci_v_zone: { $ifNull: [{ $arrayElemAt: ["$usa_zona.usa_v_zone", 0] }, 0] }
+      lat_zona:             "$_id.lat_bin",
+      lng_zona:             "$_id.lng_bin",
+      dubai_count:          1,
+      pocet_subkategorii:   { $size: { $filter: { input: "$subkategorie", cond: { $ne: ["$$this", null] } } } },
+      usa_v_stejnem_pasmu:  { $ifNull: [{ $arrayElemAt: ["$usa_pasmo.usa_v_pasmu", 0] }, 0] }
   }},
   { $sort: { dubai_count: -1 } },
   { $limit: 10 }
 ])
 ```
 
-**Jak dotaz pracuje:** Koordináty jsou zaokrouhleny dolů na celá čísla – vzniknou buňky přibližně 111×111 km. `$lookup` poté pro každou buňku počítá, kolik USA záznamů leží ve stejné zóně. Výsledek odhalí geografické překryvy nebo ukazuje, jak jsou datasety prostorově odlišné.
+**Jak dotaz pracuje:** Souřadnice se zaokrouhlí dolů na celé stupně – vzniknou zeměpisné pásy přibližně 111 km vysoké. Protože Dubai (lng ≈ 55°) a USA (lng ≈ −65° až −160°) leží na různých poledníkách, společný pásmový `$lookup` porovnává jen zeměpisnou šířku: kolik USA restaurací leží na stejné rovnoběžce (stejný `floor(latitude)`). `$filter` odstraní null hodnoty před `$size`, aby nevznikla chyba.
 
-**Interpretace výsledku:** Dubai leží přibližně na souřadnicích lat 25, lng 55. USA záznamy mají lng kolem -70 až -120. Výsledek tedy potvrdí nulový překryv a ukáže distribuci Dubai dat po čtvercové síti.
+**Interpretace výsledku:** Dubai leží hlavně na pásu lat=25 (25–26 °N). Na stejném pásu v USA leží 105 fast foodů (jih Floridy, jih Texasu). Pás lat=24 (24–25 °N) má v USA jen 7 záznamů (Havaj). Ukazuje, že Dubai a Miami / Houston jsou na stejné rovnoběžce.
 
 ---
 
@@ -575,45 +570,44 @@ db.dubai_restaurants.aggregate([
 ```javascript
 db.dubai_restaurants.aggregate([
   { $addFields: {
-      sentiment_stitek: {
+      typ_podniku: {
         $switch: {
           branches: [
-            { case: { $gt: ["$polarity",  0.5]  }, then: "Velmi pozitivní" },
-            { case: { $gt: ["$polarity",  0.1]  }, then: "Pozitivní"       },
-            { case: { $gt: ["$polarity", -0.1]  }, then: "Neutrální"       },
-            { case: { $gt: ["$polarity", -0.5]  }, then: "Negativní"       }
+            { case: { $regexMatch: { input: { $ifNull: ["$subCategory", ""] }, regex: "coffee|café|tea", options: "i" } }, then: "Kavárna / čajovna"    },
+            { case: { $regexMatch: { input: { $ifNull: ["$subCategory", ""] }, regex: "fast.food|burger|pizza|sandwich", options: "i" } }, then: "Rychlé občerstvení" },
+            { case: { $regexMatch: { input: { $ifNull: ["$subCategory", ""] }, regex: "hotel|resort", options: "i" } }, then: "Hotelová restaurace" },
+            { case: { $regexMatch: { input: { $ifNull: ["$subCategory", ""] }, regex: "bar|pub|lounge", options: "i" } }, then: "Bar / Lounge"        },
+            { case: { $ne: ["$subCategory", null] }, then: "Ostatní restaurace" }
           ],
-          default: "Velmi negativní"
+          default: "Bez subkategorie"
         }
       },
-      ma_souradnice: { $and: [{ $ne: ["$lat", null] }, { $ne: ["$lng", null] }] },
+      ma_souradnice:   { $and: [{ $ne: ["$lat", null] }, { $ne: ["$lng", null] }] },
       ma_subkategorii: { $ne: ["$subCategory", null] }
   }},
   { $unset: ["details", "reviews", "id"] },
   { $group: {
-      _id:                "$sentiment_stitek",
-      pocet:              { $sum: 1 },
-      avg_polarity:       { $avg: "$polarity" },
-      kategorie_list:     { $addToSet: "$category" },
-      se_souradnicemi:    { $sum: { $cond: ["$ma_souradnice",    1, 0] } },
-      se_subkategorii:    { $sum: { $cond: ["$ma_subkategorii", 1, 0] } }
+      _id:             "$typ_podniku",
+      pocet:           { $sum: 1 },
+      se_souradnicemi: { $sum: { $cond: ["$ma_souradnice",    1, 0] } },
+      se_subkategorii: { $sum: { $cond: ["$ma_subkategorii", 1, 0] } },
+      ukazka_nazvu:    { $push: "$name" }
   }},
-  { $sort: { avg_polarity: -1 } },
   { $project: {
       _id: 0,
-      sentiment:       "$_id",
-      pocet:           1,
-      avg_polarity:    { $round: ["$avg_polarity", 4] },
-      pestrost_kat:    { $size: "$kategorie_list" },
-      souradnice_pct:  { $round: [{ $multiply: [{ $divide: ["$se_souradnicemi", "$pocet"] }, 100] }, 1] },
-      subkat_pct:      { $round: [{ $multiply: [{ $divide: ["$se_subkategorii", "$pocet"] }, 100] }, 1] }
-  }}
+      typ_podniku:    "$_id",
+      pocet:          1,
+      souradnice_pct: { $round: [{ $multiply: [{ $divide: ["$se_souradnicemi", "$pocet"] }, 100] }, 1] },
+      subkat_pct:     { $round: [{ $multiply: [{ $divide: ["$se_subkategorii", "$pocet"] }, 100] }, 1] },
+      ukazka:         { $slice: ["$ukazka_nazvu", 3] }
+  }},
+  { $sort: { pocet: -1 } }
 ])
 ```
 
-**Jak dotaz pracuje:** `$addFields` přidá tři nová pole bez zápisu do databáze. `$unset` odstraní technické URL pole z pipeline (nezapisuje do DB). `$group` poté agreguje čistá data. Ukazuje vzor transformace „in-pipeline" bez side-effectů.
+**Jak dotaz pracuje:** `$addFields` přidá tři nová pole bez zápisu do databáze – `typ_podniku` klasifikuje restauraci pomocí `$switch` + `$regexMatch` na poli `subCategory`. `$unset` odstraní technická pole z pipeline (nezapisuje do DB). `$group` poté agreguje podle typu podniku a počítá, kolik záznamů má souřadnice a subkategorii.
 
-**Interpretace výsledku:** Výsledek ukáže, jaký podíl záznamů v každé sentiment skupině má kompletní geodata a kategorii. Záznamy bez souřadnic nemohou být použity v mapových vizualizacích.
+**Interpretace výsledku:** Výsledek ukáže typové složení Dubai restaurací – dominují kavárny, fast food a ostatní kategorie. Všechna místa mají 100 % souřadnic (geodata jsou kompletní). Skupina "Bez subkategorie" (2988 záznamů) ukazuje datovou mezeru v původním datasetu.
 
 ---
 
@@ -637,15 +631,15 @@ db.indian_restaurants.aggregate([
       cuisine_tags: {
         $filter: {
           input: [
-            { $cond: [{ $eq: ["$south_indian_or_not", 1] }, "South Indian", "$$REMOVE"] },
-            { $cond: [{ $eq: ["$north_indian_or_not", 1] }, "North Indian", "$$REMOVE"] },
-            { $cond: [{ $eq: ["$fast_food_or_not",   1] }, "Fast Food",    "$$REMOVE"] },
-            { $cond: [{ $eq: ["$street_food",         1] }, "Street Food",  "$$REMOVE"] },
-            { $cond: [{ $eq: ["$biryani_or_not",      1] }, "Biryani",      "$$REMOVE"] },
-            { $cond: [{ $eq: ["$bakery_or_not",       1] }, "Bakery",       "$$REMOVE"] }
+            { $cond: [{ $eq: ["$south_indian_or_not", 1] }, "South Indian", null] },
+            { $cond: [{ $eq: ["$north_indian_or_not", 1] }, "North Indian", null] },
+            { $cond: [{ $eq: ["$fast_food_or_not",   1] }, "Fast Food",    null] },
+            { $cond: [{ $eq: ["$street_food",         1] }, "Street Food",  null] },
+            { $cond: [{ $eq: ["$biryani_or_not",      1] }, "Biryani",      null] },
+            { $cond: [{ $eq: ["$bakery_or_not",       1] }, "Bakery",       null] }
           ],
           as:   "tag",
-          cond: { $ne: ["$$tag", "$$REMOVE"] }
+          cond: { $ne: ["$$tag", null] }
         }
       },
       popularity_score: {
@@ -692,23 +686,23 @@ db.indian_restaurants.aggregate([
 db.dubai_restaurants.aggregate([
   { $match: { subCategory: { $ne: null } } },
   { $addFields: {
-      sub_norm:      { $trim: { input: { $toLower: "$subCategory" } } },
-      polarity_band: {
+      sub_norm: { $trim: { input: { $toLower: "$subCategory" } } },
+      geo_zona: {
         $cond: {
-          if:   { $gt: ["$polarity", 0] },
-          then: "pozitivni",
+          if:   { $lt: ["$lat", 25.1] },
+          then: "Jizni Dubai",
           else: {
             $cond: {
-              if:   { $lt: ["$polarity", 0] },
-              then: "negativni",
-              else: "neutralni"
+              if:   { $lt: ["$lat", 25.2] },
+              then: "Centralni Dubai",
+              else: "Severni Dubai"
             }
           }
         }
       }
   }},
   { $group: {
-      _id:   { sub: "$sub_norm", band: "$polarity_band" },
+      _id:   { sub: "$sub_norm", zona: "$geo_zona" },
       count: { $sum: 1 },
       nazvy: { $push: "$name" }
   }},
@@ -717,7 +711,7 @@ db.dubai_restaurants.aggregate([
       total: { $sum: "$count" },
       distribuce: {
         $push: {
-          band:   "$_id.band",
+          zona:   "$_id.zona",
           count:  "$count",
           ukazky: { $slice: ["$nazvy", 2] }
         }
@@ -727,16 +721,16 @@ db.dubai_restaurants.aggregate([
   { $limit: 12 },
   { $project: {
       _id: 0,
-      subkategorie:    "$_id",
-      celkem:          "$total",
-      sentiment_dist:  "$distribuce"
+      subkategorie:  "$_id",
+      celkem:        "$total",
+      geo_distribuce: "$distribuce"
   }}
 ])
 ```
 
-**Jak dotaz pracuje:** Dvojúrovňový `$group` – první seskupuje podle kombinace (subkategorie, sentiment_band), druhý přeskupí výsledky jen podle subkategorie a vloží sentiment distribuci jako vnořené pole. Vzor „pivot" agregace v MongoDB.
+**Jak dotaz pracuje:** Dvojúrovňový `$group` – první seskupuje podle kombinace (subkategorie, geo_zona), druhý přeskupí výsledky jen podle subkategorie a vloží geografickou distribuci jako vnořené pole. Vzor „pivot" agregace v MongoDB. `$cond` vnořené do `$cond` klasifikuje každý záznam do tří zeměpisných pásem podle `lat`.
 
-**Interpretace výsledku:** Pro každou subkategorii (např. „coffee shop", „hotel", „bakery") ukazuje, jaký podíl restaurací má pozitivní vs. negativní sentiment. Subkategorie s vysokým podílem negativního sentimentu jsou oblasti, kde Dubaj zaostává za očekáváním zákazníků.
+**Interpretace výsledku:** Pro každou subkategorii ukazuje, ve které části Dubaje (jižní / centrální / severní) se restaurace koncentrují. Severní Dubai (lat > 25.2) má celkově nejvíce restaurací – odpovídá turistickým oblastem (Downtown, JBR, Marina). Jižní Dubai (lat < 25.1) je méně hustý.
 
 ---
 
@@ -899,10 +893,10 @@ db.dubai_restaurants.aggregate([
 **Zadání:** Ověř, že agregační pipeline filtrující podle `category` a `polarity` skutečně využívá compound index. Porovnej executionStats.
 
 ```javascript
-// Krok 1: Zobraz dostupné indexy na kolekci
+// Krok 1
 db.dubai_restaurants.getIndexes()
 
-// Krok 2: explain pro agregační dotaz
+// Krok 2
 db.dubai_restaurants.explain("executionStats").aggregate([
   { $match: { category: "restaurant", polarity: { $gt: 0.2 } } },
   { $sort:  { polarity: -1 } },
@@ -983,27 +977,27 @@ db.usa_fastfood.aggregate([
 **Zadání:** Porovnej výkon dotazu na Dubai restaurace při vynuceném použití hashed indexu (shard key) vs. compound indexu. Ukaž rozdíl v executionStats.
 
 ```javascript
-// Varianta A: Dotaz s compound indexem (efektivní pro range query)
+// Varianta A: Vynucení compound indexu { location: 1, subCategory: 1 } pro filtraci s prefixem
 db.dubai_restaurants.find(
-  { category: "restaurant", polarity: { $gt: 0 } },
-  { name: 1, polarity: 1, _id: 0 }
-).hint({ category: 1, polarity: -1 }).explain("executionStats")
+  { location: "Dubai", subCategory: { $ne: null } },
+  { name: 1, subCategory: 1, _id: 0 }
+).hint({ location: 1, subCategory: 1 }).explain("executionStats")
 
-// Varianta B: Dotaz bez hint – MongoDB zvolí plán sám
+// Varianta B: Tentýž dotaz bez hint – MongoDB zvolí plán sám (porovnání s Variantou A)
 db.dubai_restaurants.find(
-  { category: "restaurant", polarity: { $gt: 0 } },
-  { name: 1, polarity: 1, _id: 0 }
+  { location: "Dubai", subCategory: { $ne: null } },
+  { name: 1, subCategory: 1, _id: 0 }
 ).explain("executionStats")
 
-// Varianta C: Přímé vynucení hashed indexu (shard key)
+// Varianta C: Přímé vynucení hashed indexu (shard key) pro equality dotaz
 db.dubai_restaurants.find(
   { name: "McDonald's" }
 ).hint({ name: "hashed" }).explain("executionStats")
 ```
 
-**Jak dotaz pracuje:** `hint()` přepisuje query planner a vynutí použití konkrétního indexu. Hashed index je optimální pro **equality** dotazy na shard key (přesná shoda), ale nepomůže při range dotazech (`$gt`, `$lt`). Compound index je naopak efektivní pro range dotazy s prefixem.
+**Jak dotaz pracuje:** `hint()` přepisuje query planner a vynutí použití konkrétního indexu. Compound index `{ location: 1, subCategory: 1 }` je efektivní pro dotazy s prefixem `location` a následnou filtrací `subCategory`. Hashed index je optimální pro **equality** dotazy na shard key (přesná shoda) – MongoDB dokáže přesně lokalizovat chunk bez scatter-gather. Varianta A a B jsou identické dotazy – porovnáme, zda MongoDB sám zvolí optimální index.
 
-**Interpretace výsledku:** Varianta A by měla vykazovat nejnižší `totalDocsExamined` pro range dotaz. Varianta C ukáže, že hashed index je efektivní pro přesnou shodu jména, ale nemůže být použit pro range podmínky – MongoDB by v takovém případě provedl COLLSCAN.
+**Interpretace výsledku:** Varianta A s hint vrátí `nReturned: 4354`, `totalKeysExamined: 4357` – poměr klíčů ku dokumentům téměř 1:1, všechny tři shardy použily `IXSCAN` na `location_1_subCategory_1`. Varianta B bez hint odhalí zajímavou asymetrii: rs2 a rs3 zvolily správný compound index, ale **rs1 zvolil jednodušší `location_1`**, musel post-filtrovat null hodnoty a prošel 2 503 dokumentů pro 1 488 vrácených – celkově o **23 % více** klíčů/dokumentů oproti Variantě A. Varianta C ukáže klíčový rozdíl architektury: hashed shard key přeloží "McDonald's" na hash `[-6917824619940975324]`, dotaz zamíří jen na **rs3** (`SINGLE_SHARD` místo `SHARD_MERGE`) a vrátí 17 dokumentů za 3 ms místo 12 ms – ukázka targeted query vs. scatter-gather.
 
 ---
 
@@ -1031,27 +1025,33 @@ db.dubai_restaurants.aggregate([
       }
   }},
   { $group: {
-      _id:          "$zona",
-      pocet:        { $sum: 1 },
-      avg_polarity: { $avg: "$polarity" },
-      kategorie:    { $addToSet: "$category" },
-      ukazky:       { $push: "$name" }
+      _id:         "$zona",
+      pocet:       { $sum: 1 },
+      avg_lat:     { $avg: "$lat" },
+      avg_lng:     { $avg: "$lng" },
+      subkategorie: { $addToSet: "$subCategory" },
+      ukazky:      { $push: "$name" }
   }},
   { $sort: { pocet: -1 } },
   { $project: {
       _id: 0,
-      zona:          "$_id",
+      zona:             "$_id",
       pocet_restauraci: "$pocet",
-      avg_sentiment: { $round: ["$avg_polarity", 3] },
-      pestrost_kat:  { $size: "$kategorie" },
-      ukazky:        { $slice: ["$ukazky", 3] }
+      centroid: {
+        lat: { $round: ["$avg_lat", 4] },
+        lng: { $round: ["$avg_lng", 4] }
+      },
+      pocet_subkategorii: {
+        $size: { $filter: { input: "$subkategorie", as: "s", cond: { $ne: ["$s", null] } } }
+      },
+      ukazky: { $slice: ["$ukazky", 3] }
   }}
 ])
 ```
 
-**Jak dotaz pracuje:** `$match` na dvou číselných polích `lat` a `lng` s range podmínkami využívá compound index `{ lat: 1, lng: 1 }` – MongoDB prohledá jen relevantní část B-tree indexu. `$addFields` se `$switch` pak přiřadí každé restauraci konkrétní dubajskou čtvrť.
+**Jak dotaz pracuje:** `$match` na dvou číselných polích `lat` a `lng` s range podmínkami využívá compound index `{ lat: 1, lng: 1 }` – MongoDB prohledá jen relevantní část B-tree indexu. `$addFields` se `$switch` přiřadí každé restauraci konkrétní dubajskou čtvrť podle přesných souřadnic. `$group` spočítá průměrné souřadnice zóny (centroid) a počet unikátních subkategorií.
 
-**Interpretace výsledku:** Výsledek ukáže rozložení a sentiment restaurací v různých dubajských čtvrtích. Turisticky orientované oblasti (JBR, Marina) typicky vykazují vyšší sentiment než okrajové oblasti.
+**Interpretace výsledku:** Výsledek ukáže rozložení restaurací v různých dubajských čtvrtích s geografickým centroidem každé zóny (průměrné souřadnice). Turisticky orientované oblasti (JBR, Marina) typicky vykazují vyšší pestrost subkategorií. Centroid pomáhá vizualizovat zóny na mapě.
 
 ---
 
@@ -1060,12 +1060,12 @@ db.dubai_restaurants.aggregate([
 **Zadání:** Ověř efektivitu compound indexu pro dotaz na indické restaurace v Mumbaji s hodnocením ≥ 4.0. Zobraz top 5 restaurací a exekuční statistiky.
 
 ```javascript
-// Krok 1: Targeted dotaz s explain
+// Krok 1
 db.indian_restaurants.find(
   { location: "Mumbai", rating: { $gte: 4.0 } }
 ).hint({ location: 1, rating: -1 }).sort({ rating: -1, average_price: 1 }).explain("executionStats")
 
-// Krok 2: Analytický dotaz s výsledky (bez explain)
+// Krok 2
 db.indian_restaurants.aggregate([
   { $match: { location: "Mumbai", rating: { $gte: 4.0 } } },
   { $sort:  { rating: -1, average_price: 1 } },
@@ -1109,23 +1109,22 @@ db.indian_restaurants.aggregate([
 ```javascript
 use config
 
-db.chunks.aggregate([
-  { $match: {
-      ns: { $in: [
-        "restaurants.dubai_restaurants",
-        "restaurants.usa_fastfood",
-        "restaurants.indian_restaurants"
-      ]}
+db.collections.aggregate([
+  { $match: { _id: { $regex: "^restaurants\\." } } },
+  { $lookup: {
+      from:         "chunks",
+      localField:   "uuid",
+      foreignField: "uuid",
+      as:           "chunk_docs"
   }},
+  { $unwind: "$chunk_docs" },
   { $group: {
-      _id:         { ns: "$ns", shard: "$shard" },
+      _id:          { ns: "$_id", shard: "$chunk_docs.shard" },
       pocet_chunku: { $sum: 1 }
   }},
   { $group: {
-      _id:          "$_id.ns",
-      shardy: {
-        $push: { shard: "$_id.shard", chunky: "$pocet_chunku" }
-      },
+      _id:           "$_id.ns",
+      shardy:        { $push: { shard: "$_id.shard", chunky: "$pocet_chunku" } },
       celkem_chunku: { $sum: "$pocet_chunku" }
   }},
   { $project: {
@@ -1138,7 +1137,7 @@ db.chunks.aggregate([
 ])
 ```
 
-**Jak dotaz pracuje:** `config.chunks` je systémová kolekce MongoDB která eviduje všechny chunky clusteru. Dvojúrovňový `$group` nejprve sečte chunky per (kolekce, shard) kombinaci, poté seskupí per kolekci s polem distribuce. Výsledek je dostupný pouze přes `mongos` nebo přes config server.
+**Jak dotaz pracuje:** Od MongoDB 6.0 pole `ns` v `config.chunks` bylo nahrazeno polem `uuid`. Dotaz proto začíná v `config.collections` (kde je mapování namespace → UUID) a přes `$lookup` spojí s `config.chunks`. Dvojúrovňový `$group` nejprve sečte chunky per (kolekce, shard) kombinaci, poté seskupí per kolekci s polem distribuce. Výsledek je dostupný pouze přes `mongos` nebo přes config server.
 
 **Interpretace výsledku:** Rovnoměrná distribuce (stejný počet chunků na každém shardu) znamená, že balancer funguje správně. Odchylka > 2× naznačuje nevyvážený shard key nebo příliš velké chunky – záznamy se hromadí na jednom shardu (hotspot).
 
@@ -1151,27 +1150,42 @@ db.chunks.aggregate([
 ```javascript
 use restaurants
 
-// Dubai statistiky
 db.dubai_restaurants.aggregate([
-  { $collStats: {
-      storageStats: { scale: 1024 },
-      count:        {}
+  { $collStats: { storageStats: { scale: 1024 }, count: {} } },
+  { $project: {
+      shard:        1,
+      count:        1,
+      "storageStats.size":       1,
+      "storageStats.count":      1,
+      "storageStats.avgObjSize": 1,
+      "storageStats.nindexes":   1,
+      "storageStats.totalIndexSize": 1
   }}
 ])
 
-// USA statistiky
 db.usa_fastfood.aggregate([
-  { $collStats: {
-      storageStats: { scale: 1024 },
-      count:        {}
+  { $collStats: { storageStats: { scale: 1024 }, count: {} } },
+  { $project: {
+      shard:        1,
+      count:        1,
+      "storageStats.size":       1,
+      "storageStats.count":      1,
+      "storageStats.avgObjSize": 1,
+      "storageStats.nindexes":   1,
+      "storageStats.totalIndexSize": 1
   }}
 ])
 
-// India statistiky
 db.indian_restaurants.aggregate([
-  { $collStats: {
-      storageStats: { scale: 1024 },
-      count:        {}
+  { $collStats: { storageStats: { scale: 1024 }, count: {} } },
+  { $project: {
+      shard:        1,
+      count:        1,
+      "storageStats.size":       1,
+      "storageStats.count":      1,
+      "storageStats.avgObjSize": 1,
+      "storageStats.nindexes":   1,
+      "storageStats.totalIndexSize": 1
   }}
 ])
 ```
@@ -1187,22 +1201,34 @@ db.indian_restaurants.aggregate([
 **Zadání:** Zobraz kompletní přehled stavu MongoDB sharded clusteru – seznam shardů, jejich stav, verze a konfiguraci balanceru.
 
 ```javascript
-// Krok 1: Seznam shardů a jejich stav
+// Krok 1
 use admin
 db.adminCommand({ listShards: 1 })
 
-// Krok 2: Stav mongos serveru
-db.adminCommand({ serverStatus: 1 })
+// Krok 2
+var s = db.adminCommand({ serverStatus: 1 });
+printjson({
+  version:     s.version,
+  uptime_sec:  s.uptimeEstimate,
+  opcounters:  s.opcounters,
+  connections: s.connections,
+  sharding: {
+    configsvr:         s.sharding.configsvrConnectionString,
+    maxChunkSizeBytes: s.sharding.maxChunkSizeInBytes,
+    routerEnabled:     s.sharding.routerServiceEnabled
+  },
+  hostsTargeted: s.shardingStatistics.numHostsTargeted
+});
 
-// Krok 3: Kompletní přehled shardingu (přes mongos)
+// Krok 3
 sh.status()
 
-// Krok 4: Konfigurace balanceru
+// Krok 4
 use config
 db.settings.find({ _id: "balancer" }).pretty()
 db.settings.find({ _id: "chunksize" }).pretty()
 
-// Krok 5: Přehled kolekcí a jejich shard keys
+// Krok 5
 db.collections.find(
   { _id: { $regex: "^restaurants\\." } },
   { _id: 1, key: 1, unique: 1 }
@@ -1220,85 +1246,90 @@ db.collections.find(
 **Zadání:** Zkontroluj stav jednoho z replica setů (např. rs1) – kdo je primary, kdo secondary, jaký je replication lag a kdy naposledy proběhla heartbeat komunikace.
 
 ```javascript
-// Připojení přímo na shard (ne přes mongos)
-// mongosh --host shard1-1 --port 27018 -u admin -p RestCluster2024! --authenticationDatabase admin
+// Poznámka: admin user byl vytvořen přes mongos a je uložen v config serveru.
+// Přímé připojení k individuálním shardům (shard1-1:27018) vyžaduje lokálního uživatele
+// na každém shardu – tento uživatel v aktuálním setupu neexistuje.
+// Proto se připojíme na config server primary (configsvr1:27019), kde admin user existuje.
+// docker exec -it configsvr1 mongosh --port 27019 -u admin -p 'RestCluster2024!' --authenticationDatabase admin
 
-// Krok 1: Kompletní stav replica setu
+// Krok 1
 rs.status()
 
-// Krok 2: Přehled replication lag pro každý člen
+// Krok 2
 rs.status().members.forEach(function(m) {
   print("Člen: " + m.name +
         " | Stav: " + m.stateStr +
-        " | Optime: " + (m.optimeDate ? m.optimeDate : "N/A") +
-        " | Lag: " + (m.lastHeartbeatMessage || "primary/self"));
+        " | Health: " + m.health +
+        " | Optime: " + (m.optimeDate ? m.optimeDate : "N/A"));
 })
 
-// Krok 3: Replication lag v sekundách (porovnání optimeDate primary vs secondary)
+// Krok 3
 var status    = rs.status();
 var primary   = status.members.find(m => m.stateStr === "PRIMARY");
 var secondary = status.members.find(m => m.stateStr === "SECONDARY");
 if (primary && secondary) {
   var lagSec = (primary.optimeDate - secondary.optimeDate) / 1000;
   print("Replication lag: " + lagSec + " sekund");
+} else {
+  print("Nelze zjistit lag – primary nebo secondary nenalezen");
 }
 
-// Krok 4: Konfigurace replica setu
+// Krok 4
 rs.conf()
 ```
 
-**Jak dotaz pracuje:** `rs.status()` vrátí aktuální stav všech členů replica setu včetně posledního aplikovaného oplog záznamu (`optimeDate`). Replication lag = rozdíl `optimeDate` primary vs. secondary v milisekundách. Nulový nebo velmi malý lag znamená, že secondary jsou synchronizovány.
+**Poznámka k architektuře:** V MongoDB sharded clusteru jsou uživatelé vytvořeni přes `mongos` uloženi v config server replica setu (CSRS). Individuální shardy (rs1, rs2, rs3) nemají tyto uživatele ve svých lokálních admin databázích – jejich vzájemná autentizace probíhá přes keyfile. Pro přímý přístup na shard nodes by bylo nutné vytvořit lokální admin uživatele přímo na každém shardu. Toto je standardní bezpečnostní aspekt MongoDB sharded cluster architektury.
 
-**Interpretace výsledku:** V klidném clusteru bez zátěže by replication lag měl být < 1 sekunda. Záznamy s `stateStr: "SECONDARY"` a `health: 1` indikují zdravý stav. `rs.conf()` potvrdí konfiguraci voličů (votes) a priorit členů.
+**Jak dotaz pracuje:** `rs.status()` vrátí aktuální stav všech členů replica setu včetně posledního aplikovaného oplog záznamu (`optimeDate`). Replication lag = rozdíl `optimeDate` primary vs. secondary v milisekundách dělený 1000. Nulový nebo velmi malý lag znamená, že secondary jsou synchronizovány.
+
+**Interpretace výsledku:** V klidném clusteru bez zátěže by replication lag měl být < 1 sekunda (typicky 0). Záznamy s `stateStr: "SECONDARY"` a `health: 1` indikují zdravý stav. `rs.conf()` potvrdí konfiguraci voličů (votes) a priorit členů CSRS.
 
 ---
 
 ### Dotaz 29 – Simulace výpadku primary uzlu (rs.stepDown) + sledování nové volby
 
-**Zadání:** Nasimuluj výpadek primary uzlu v replica setu rs1 pomocí `rs.stepDown()`. Sleduj průběh volby nového primary a ověř, že cluster zůstane dostupný.
+**Zadání:** Nasimuluj výpadek primary uzlu v config server replica setu (CSRS) pomocí `rs.stepDown()`. Sleduj průběh volby nového primary a ověř, že cluster zůstane dostupný přes mongos.
 
 ```javascript
-// ===== PŘÍPRAVA: Připojit se přímo na shard1-1 (aktuální primary) =====
-// mongosh --host shard1-1 --port 27018 -u admin -p RestCluster2024! --authenticationDatabase admin
+// ===== PŘÍPRAVA: Připojit se na configsvr1 (aktuální CSRS primary) =====
+// docker exec -it configsvr1 mongosh --port 27019 -u admin -p 'RestCluster2024!' --authenticationDatabase admin
 
-// Krok 1: Ověř, kdo je primary před výpadkem
+// Krok 1 – ověř že jsi na primary
 rs.isMaster()
 
-// Krok 2: Vyvolej stepDown (primary se vzdá role na 60 sekund)
-// Upozornění: tím se přeruší aktuální připojení
+// Krok 2 – stepDown (60 s timeout pro nového primary)
+// Upozornění: připojení se přeruší – to je očekávané chování
 rs.stepDown(60)
 
-// Krok 3: Po reconnect – zjisti nového primary (může trvat 10-30 sekund)
-// Znovu spusť: mongosh --host shard1-1 --port 27018 ...
-rs.status()
+// Krok 3 – znovu se připoj a zjisti kdo je nový primary
+// docker exec -it configsvr1 mongosh --port 27019 -u admin -p 'RestCluster2024!' --authenticationDatabase admin
+rs.status().members.forEach(m => print(m.name, "->", m.stateStr))
 
-// Krok 4: Ověř dostupnost z mongos i po výpadku
-// Připojit přes mongos:
-// mongosh --host mongos --port 27017 -u admin -p RestCluster2024! --authenticationDatabase admin
+// Krok 4 – ověř že cluster přes mongos stále funguje (v jiném terminálu)
+// docker exec -it mongos mongosh --port 27017 -u admin -p 'RestCluster2024!' --authenticationDatabase admin
 use restaurants
 db.dubai_restaurants.countDocuments()
-db.dubai_restaurants.findOne({ polarity: { $gt: 0.5 } })
+db.indian_restaurants.findOne({ rating: { $gte: 4.5 } }, { restaurant_name: 1, rating: 1, location: 1, _id: 0 })
 
-// Krok 5: Sleduj stav replica setu každých 5 sekund
+// Krok 5 – sleduj průběh volby (spusť těsně po stepDown, na configsvr2 nebo configsvr3)
+// docker exec -it configsvr2 mongosh --port 27019 -u admin -p 'RestCluster2024!' --authenticationDatabase admin
 var i = 0;
-while (i < 6) {
-  var s = rs.status();
-  s.members.forEach(function(m) {
-    print(m.name + " -> " + m.stateStr);
-  });
+while (i < 4) {
+  rs.status().members.forEach(m => print(m.name, "->", m.stateStr));
   print("---");
-  sleep(5000);
+  sleep(3000);
   i++;
 }
 
-// Krok 6: Ověř oplog pro případ ztráty zápisu
+// Krok 6 – oplog: posledních 5 zápisů v CSRS
 use local
-db.oplog.rs.find().sort({ $natural: -1 }).limit(5).pretty()
+db.oplog.rs.find().sort({ $natural: -1 }).limit(5)
+  .forEach(e => print(e.op, e.ns, JSON.stringify(e.o).substring(0, 60)))
 ```
 
-**Jak dotaz pracuje:** `rs.stepDown()` je bezpečná metoda simulace výpadku – primary se dobrovolně vzdá role a spustí se election protokol (Raft-based). Zbývající dva secondary uzly (musejí mít quorum = 2 z 3 hlasů) zvolí nového primary. Celý proces typicky trvá 10–30 sekund. Data jsou při tomto procesu dostupná přes mongos díky read-preference `primaryPreferred`.
+**Jak dotaz pracuje:** `rs.stepDown()` je bezpečná metoda simulace výpadku – primary se dobrovolně vzdá role a spustí se election protokol (Raft-based). Zbývající dva secondary uzly (musejí mít quorum = 2 z 3 hlasů) zvolí nového primary. Celý proces typicky trvá 10–30 sekund. Demonstrujeme na CSRS (config server RS) protože admin user existuje lokálně na config serverech. Data jsou při tomto procesu dostupná přes mongos díky `primaryPreferred` read preference.
 
-**Interpretace výsledku:** Po `rs.stepDown()` jeden ze secondary uzlů přejde do stavu `PRIMARY`. Původní primary se vrátí jako `SECONDARY`. Dotazy přes mongos (`countDocuments()`) by měly stále fungovat – to je důkazem vysoké dostupnosti (HA) replica set architektury. Nulová ztráta dat potvrzuje durability zápisů.
+**Interpretace výsledku:** Po `rs.stepDown()` jeden ze secondary uzlů (configsvr2 nebo configsvr3) přejde do stavu `PRIMARY`. Původní primary (configsvr1) se vrátí jako `SECONDARY` – díky `priority: 2` se po uplynutí `stepDown` timeoutu vrátí zpět na primary. Dotazy přes mongos (`countDocuments()`) stále fungují – důkaz HA architektury. Oplog zobrazí poslední transakce clusteru.
 
 ---
 
@@ -1307,7 +1338,7 @@ db.oplog.rs.find().sort({ $natural: -1 }).limit(5).pretty()
 **Zadání:** Zkontroluj historii migrací balanceru v config databázi a ověř konzistenci dat oproti validačnímu schématu (počet dokumentů bez povinných polí).
 
 ```javascript
-// Krok 1: Historie migrací chunků (balancer log)
+// Krok 1
 use config
 db.changelog.aggregate([
   { $match: {
@@ -1329,7 +1360,7 @@ db.changelog.aggregate([
   }}
 ])
 
-// Krok 2: Validace – záznamy bez povinných polí v dubai_restaurants
+// Krok 2
 use restaurants
 db.dubai_restaurants.aggregate([
   { $project: {
@@ -1359,7 +1390,7 @@ db.dubai_restaurants.aggregate([
   }}
 ])
 
-// Krok 3: Počty dokumentů na jednotlivých shardech (per kolekce)
+// Krok 3
 db.dubai_restaurants.aggregate([
   { $collStats: { count: {} } },
   { $project: { shard: 1, count: 1, _id: 0 } }
