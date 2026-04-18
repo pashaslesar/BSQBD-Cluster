@@ -507,9 +507,7 @@ services:
     entrypoint: ["/bin/bash", "/scripts/mongos-entrypoint.sh"]
     environment:
       MONGO_ADMIN_USER: admin
-      MONGO_ADMIN_PASS: RestCluster2024!
-      MONGO_APP_USER: appuser
-      MONGO_APP_PASS: AppPass2024!
+      MONGO_ADMIN_PASS: admin123
     volumes:
       - ./FunctionalSolution/scripts:/scripts:ro
       - ./Data:/csv-data:ro
@@ -532,7 +530,7 @@ services:
   compass-web:
     image: haohanyang/compass-web:latest
     container_name: compass-web
-    command: compass-web --host 0.0.0.0 --mongo-uri "mongodb://admin:RestCluster2024!@mongos:27017/admin"
+    command: compass-web --host 0.0.0.0 --mongo-uri "mongodb://admin:admin123@mongos:27017/admin"
     ports:
       - "8080:8080"
     networks:

@@ -1,9 +1,7 @@
 set -e
 
 ADMIN_USER="${MONGO_ADMIN_USER:-admin}"
-ADMIN_PASS="${MONGO_ADMIN_PASS:-RestCluster2024!}"
-APP_USER="${MONGO_APP_USER:-appuser}"
-APP_PASS="${MONGO_APP_PASS:-AppPass2024!}"
+ADMIN_PASS="${MONGO_ADMIN_PASS:-admin123}"
 
 MAUTH="-u $ADMIN_USER -p $ADMIN_PASS --authenticationDatabase admin"
 
@@ -49,7 +47,7 @@ echo "[ok]   mongos is up"
 
 echo ""
 echo "══════════════════════════════════════════"
-echo " STEP 3 – Create admin & app users"
+echo " STEP 3 – Create admin user"
 echo "══════════════════════════════════════════"
 
 
@@ -65,22 +63,6 @@ else
             roles: [{ role: 'root', db: 'admin' }]
         });
         print('[done] Admin user created: $ADMIN_USER');
-    "
-fi
-
-if mongosh --host localhost --port 27017 --quiet $MAUTH \
-    --eval "var u = db.getSiblingDB('restaurants').getUser('$APP_USER'); print(u ? 'exists' : 'none')" \
-    2>/dev/null | grep -q "^exists"; then
-    echo "[skip] App user '$APP_USER' already exists"
-else
-    echo "[create] Creating app user '$APP_USER' ..."
-    mongosh --host localhost --port 27017 --quiet $MAUTH --eval "
-        db.getSiblingDB('restaurants').createUser({
-            user: '$APP_USER',
-            pwd:  '$APP_PASS',
-            roles: [{ role: 'readWrite', db: 'restaurants' }]
-        });
-        print('[done] App user created: $APP_USER');
     "
 fi
 
@@ -367,7 +349,7 @@ echo "║   Information                            ║"
 echo "║                                          ║"
 echo "║   mongosh (admin):                       ║"
 echo "║     mongosh localhost:27017              ║"
-echo "║     -u admin -p RestCluster2024!         ║"
+echo "║     -u admin -p admin123                 ║"
 echo "║     --authenticationDatabase admin       ║"
 echo "║                                          ║"
 echo "║   Compass Web:  http://localhost:8080    ║"

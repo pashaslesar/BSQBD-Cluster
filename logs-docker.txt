@@ -1,1 +1,4 @@
-watch -n 5 'docker ps --format "table {{.Names}}\t{{.Status}}"'
+docker logs -f mongos 2>&1 | sed '/Cluster setup complete/q'
+
+docker logs -f mongos 2>&1 | ForEach-Object { Write-Host $_; if ($_ -match "Cluster setup complete") { break } }
+docker compose logs -f mongos 2>&1 | grep -m 1 "Cluster setup complete"

@@ -4,7 +4,7 @@ DB="restaurants"
 DATA_DIR="/csv-data"
 
 ADMIN_USER="${MONGO_ADMIN_USER:-admin}"
-ADMIN_PASS="${MONGO_ADMIN_PASS:-RestCluster2024!}"
+ADMIN_PASS="${MONGO_ADMIN_PASS:-admin123}"
 
 
 count_docs() {
