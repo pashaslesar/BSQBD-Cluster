@@ -4,3 +4,17 @@ docker logs -f mongos 2>&1 | ForEach-Object { Write-Host $_; if ($_ -match "Clus
 docker compose logs -f mongos 2>&1 | grep -m 1 "Cluster setup complete"
 
 docker exec -it mongos mongosh --port 27017 -u admin -p admin123 --authenticationDatabase admin
+
+// распределение чанков по шардам
+use config
+db.chunks.aggregate([
+  { $group: { _id: "$shard", chunks: { $sum: 1 } } },
+  { $sort: { _id: 1 } }
+])
+
+// сколько документов на каждом шарде для конкретной коллекции
+use restaurants
+db.indian_restaurants.aggregate([
+  { $collStats: { count: {} } },
+  { $project: { shard: 1, count: 1, _id: 0 } }
+])
