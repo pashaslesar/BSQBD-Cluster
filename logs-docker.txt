@@ -2,3 +2,5 @@ docker logs -f mongos 2>&1 | sed '/Cluster setup complete/q'
 
 docker logs -f mongos 2>&1 | ForEach-Object { Write-Host $_; if ($_ -match "Cluster setup complete") { break } }
 docker compose logs -f mongos 2>&1 | grep -m 1 "Cluster setup complete"
+
+docker exec -it mongos mongosh --port 27017 -u admin -p admin123 --authenticationDatabase admin
