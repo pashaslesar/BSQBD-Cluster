@@ -1250,7 +1250,7 @@ db.collections.find(
 // Přímé připojení k individuálním shardům (shard1-1:27018) vyžaduje lokálního uživatele
 // na každém shardu – tento uživatel v aktuálním setupu neexistuje.
 // Proto se připojíme na config server primary (configsvr1:27019), kde admin user existuje.
-// docker exec -it configsvr1 mongosh --port 27019 -u admin -p 'RestCluster2024!' --authenticationDatabase admin
+// docker exec -it configsvr1 mongosh --port 27019 -u admin -p 'admin123' --authenticationDatabase admin
 
 // Krok 1
 rs.status()
@@ -1292,7 +1292,7 @@ rs.conf()
 
 ```javascript
 // ===== PŘÍPRAVA: Připojit se na configsvr1 (aktuální CSRS primary) =====
-// docker exec -it configsvr1 mongosh --port 27019 -u admin -p 'RestCluster2024!' --authenticationDatabase admin
+// docker exec -it configsvr1 mongosh --port 27019 -u admin -p 'admin123' --authenticationDatabase admin
 
 // Krok 1 – ověř že jsi na primary
 rs.isMaster()
@@ -1302,17 +1302,17 @@ rs.isMaster()
 rs.stepDown(60)
 
 // Krok 3 – znovu se připoj a zjisti kdo je nový primary
-// docker exec -it configsvr1 mongosh --port 27019 -u admin -p 'RestCluster2024!' --authenticationDatabase admin
+// docker exec -it configsvr1 mongosh --port 27019 -u admin -p 'admin123' --authenticationDatabase admin
 rs.status().members.forEach(m => print(m.name, "->", m.stateStr))
 
 // Krok 4 – ověř že cluster přes mongos stále funguje (v jiném terminálu)
-// docker exec -it mongos mongosh --port 27017 -u admin -p 'RestCluster2024!' --authenticationDatabase admin
+// docker exec -it mongos mongosh --port 27017 -u admin -p 'admin123' --authenticationDatabase admin
 use restaurants
 db.dubai_restaurants.countDocuments()
 db.indian_restaurants.findOne({ rating: { $gte: 4.5 } }, { restaurant_name: 1, rating: 1, location: 1, _id: 0 })
 
 // Krok 5 – sleduj průběh volby (spusť těsně po stepDown, na configsvr2 nebo configsvr3)
-// docker exec -it configsvr2 mongosh --port 27019 -u admin -p 'RestCluster2024!' --authenticationDatabase admin
+// docker exec -it configsvr2 mongosh --port 27019 -u admin -p 'admin123' --authenticationDatabase admin
 var i = 0;
 while (i < 4) {
   rs.status().members.forEach(m => print(m.name, "->", m.stateStr));
